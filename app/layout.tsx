@@ -3,10 +3,15 @@ import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "연료전지 EPC 견적 스튜디오 | Fuel Cell EPC Estimate Studio",
+const copy = {
+  title: "SOFC EPC \uACAC\uC801 \uC2A4\uD29C\uB514\uC624 | Fuel Cell EPC Estimate Studio",
   description:
-    "연료전지 EPC 견적을 위한 레퍼런스 기반 워크스페이스. Reference-driven fuel-cell EPC estimation workspace with workbook import, escalation logic, risk review, and LCOE comparison.",
+    "\uC6CC\uD06C\uBD81 \uAE30\uC900 SOFC EPC \uACAC\uC801, \uBB3C\uAC00\uC0C1\uC2B9, \uD604\uC7A5\uC870\uAC74, \uB9AC\uC2A4\uD06C, LCOE\uB97C \uD55C \uD654\uBA74\uC5D0\uC11C \uAC80\uD1A0\uD558\uB294 \uC2A4\uD29C\uB514\uC624.",
+};
+
+export const metadata: Metadata = {
+  title: copy.title,
+  description: copy.description,
 };
 
 export default function RootLayout({

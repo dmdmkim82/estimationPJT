@@ -20,6 +20,23 @@ import {
 
 const STORAGE_KEY = "fuel-cell-epc-reference-db-v1";
 
+const copy = {
+  refWorkbookDesc:
+    "\uAE30\uC900 \uC6CC\uD06C\uBD81\uC744 \uBD88\uB7EC\uC624\uACE0 \uBAA9\uD45C \uD504\uB85C\uC81D\uD2B8 \uAE30\uC900\uC73C\uB85C \uBC14\uB85C \uD658\uC0B0\uD569\uB2C8\uB2E4.",
+  importing: "\uC6CC\uD06C\uBD81 \uBD88\uB7EC\uC624\uB294 \uC911...",
+  uploadWorkbook: "\uAE30\uC900 \uC6CC\uD06C\uBD81 \uC5C5\uB85C\uB4DC",
+  localParse:
+    "Excel \uD30C\uC77C\uC744 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uBC14\uB85C \uC77D\uC2B5\uB2C8\uB2E4.",
+  eok: "\uC5B5\uC6D0",
+  basis: "\uAE30\uC900\uC73C\uB85C",
+  resultTail: "\uB97C \uBC18\uC601\uD55C \uACB0\uACFC\uC785\uB2C8\uB2E4.",
+  preEsc: "\uC5F0\uB3C4 \uBCF4\uC815 \uC804",
+  startYearBasis: "\uCC29\uACF5\uC5F0\uB3C4 \uAE30\uC900",
+  coreBasis: "\uAE30\uC900 + \uD0C0\uC785 + \uB3C4\uBA74",
+  siteAdder: "\uD604\uC7A5 / \uACC4\uD1B5 \uAC00\uC0B0",
+  drawingReflect: "\uB3C4\uBA74 \uCC28\uC774 \uBC18\uC601",
+};
+
 function clampNumber(value: number, min: number, max: number) {
   if (Number.isNaN(value)) return min;
   return Math.min(max, Math.max(min, value));
@@ -224,10 +241,7 @@ export function EstimateStudio() {
             <div className="control-header">
               <span className="control-label">Reference DB</span>
               <h2>Fuel Cell Estimate Studio</h2>
-              <p>
-                Upload reference PJT workbooks into a browser-local library, then
-                scale, escalate, and compare against the target project.
-              </p>
+              <p>{copy.refWorkbookDesc}</p>
             </div>
 
             <label className="upload-zone">
@@ -238,8 +252,8 @@ export function EstimateStudio() {
                 type="file"
                 onChange={handleReferenceImport}
               />
-              <span>{isImporting ? "Importing workbook..." : "Upload reference workbook(s)"}</span>
-              <small>Excel files are parsed on-device into a local reference DB.</small>
+              <span>{isImporting ? copy.importing : copy.uploadWorkbook}</span>
+              <small>{copy.localParse}</small>
             </label>
 
             {importError ? <p className="feedback feedback--error">{importError}</p> : null}
@@ -531,7 +545,7 @@ export function EstimateStudio() {
                   <div className="site-row__meta">
                     <strong>{item.label}</strong>
                     <span>
-                      {item.unitPriceEokPerUnit.toFixed(3)} x100M KRW / {item.unit}
+                      {item.unitPriceEokPerUnit.toFixed(3)}{copy.eok} / {item.unit}
                     </span>
                   </div>
                   <input
@@ -764,9 +778,11 @@ export function EstimateStudio() {
               <span className="control-label">EPC Quote</span>
               <h2>{formatEok(result.grandTotal)}</h2>
               <p>
-                {input.projectName} uses <strong>{selectedReference.name}</strong> as the
-                reference basis, scaled to {input.capacityMw.toFixed(1)}MW and escalated{" "}
-                {result.years} year(s) from {input.baseYear} to {input.startYear}.
+                <strong>{selectedReference.name}</strong> {copy.basis}{" "}
+                {input.capacityMw.toFixed(1)}MW, {input.baseYear}
+                {" -> "}
+                {input.startYear}
+                {copy.resultTail}
               </p>
             </div>
             <div className="result-main__meta">
@@ -792,22 +808,22 @@ export function EstimateStudio() {
             <article className="summary-card">
               <span className="summary-card__label">Scaled reference</span>
               <strong>{formatEok(result.scaledReferenceTotalEok)}</strong>
-              <span className="summary-card__sub">Before year escalation</span>
+              <span className="summary-card__sub">{copy.preEsc}</span>
             </article>
             <article className="summary-card">
               <span className="summary-card__label">Escalated reference</span>
               <strong>{formatEok(result.escalatedReferenceTotalEok)}</strong>
-              <span className="summary-card__sub">Reference PJT escalated to start year</span>
+              <span className="summary-card__sub">{copy.startYearBasis}</span>
             </article>
             <article className="summary-card">
               <span className="summary-card__label">Core EPC subtotal</span>
               <strong>{formatEok(result.costSubtotal)}</strong>
-              <span className="summary-card__sub">Reference + type adders + drawing changes</span>
+              <span className="summary-card__sub">{copy.coreBasis}</span>
             </article>
             <article className="summary-card">
               <span className="summary-card__label">Site additions</span>
               <strong>{formatEok(result.siteSubtotal)}</strong>
-              <span className="summary-card__sub">Field review and utility allowances</span>
+              <span className="summary-card__sub">{copy.siteAdder}</span>
             </article>
             <article className="summary-card">
               <span className="summary-card__label">Warranty</span>
@@ -819,7 +835,7 @@ export function EstimateStudio() {
             <article className="summary-card">
               <span className="summary-card__label">Drawing change adders</span>
               <strong>{formatEok(result.drawingSubtotal)}</strong>
-              <span className="summary-card__sub">Reference vs target drawing allowance</span>
+              <span className="summary-card__sub">{copy.drawingReflect}</span>
             </article>
           </div>
 
@@ -1029,7 +1045,7 @@ export function EstimateStudio() {
               <div className="detail-list">
                 <div className="detail-list__row">
                   <strong>Estimated land use</strong>
-                  <span>{result.layout.estimatedLandM2.toLocaleString("en-US")} m²</span>
+                  <span>{result.layout.estimatedLandM2.toLocaleString("en-US")} m2</span>
                 </div>
                 {result.layout.notes.map((note, index) => (
                   <div className="detail-list__row" key={`layout-note-${index}`}>

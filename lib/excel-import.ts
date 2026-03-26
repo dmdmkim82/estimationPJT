@@ -15,9 +15,9 @@ type ParsedRow = {
 };
 
 const HEADER_KEYWORDS = {
-  name: ["item", "name", "description", "항목", "품명", "내역", "공종", "내용", "scope"],
+  name: ["item", "name", "description", "품명", "항목", "내역", "공종", "내용", "scope"],
   category: ["category", "type", "분류", "구분", "대분류", "spc", "s/p/c"],
-  amount: ["amount", "cost", "price", "금액", "합계", "도급", "계", "total", "epc"],
+  amount: ["amount", "cost", "price", "금액", "합계", "공사비", "원", "total", "epc"],
   note: ["note", "remark", "비고", "사유", "근거", "comment"],
 };
 
@@ -38,7 +38,7 @@ function parseNumeric(value: unknown) {
 
   const normalized = text
     .replace(/,/g, "")
-    .replace(/₩/g, "")
+    .replace(/원/g, "")
     .replace(/krw/gi, "")
     .replace(/\(([^)]+)\)/g, "-$1")
     .replace(/[^\d.-]/g, "");
@@ -182,7 +182,7 @@ function parseSheetRows(sheetName: string, rows: unknown[][]) {
       if (!name || rawAmount === null || rawAmount === 0) return null;
 
       const loweredName = name.toLowerCase();
-      if (/(total|subtotal|합계|소계)/i.test(loweredName)) return null;
+      if (/(total|subtotal|합계|총계)/i.test(loweredName)) return null;
 
       return {
         name,
@@ -263,7 +263,7 @@ export async function importReferenceWorkbook(file: File): Promise<ReferenceProj
     notes: [
       `Imported from ${file.name}`,
       `${rowsBySheet.length} worksheet(s) scanned`,
-      `Metadata inferred from workbook text; verify year and MW before final use.`,
+      "Metadata was inferred from workbook text. Verify year and MW before final use.",
     ],
   };
 }

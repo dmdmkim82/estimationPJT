@@ -779,7 +779,7 @@ export function formatEok(value: number, digits = 2) {
   return `${value.toLocaleString("en-US", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
-  })} x100M KRW`;
+  })}\uC5B5\uC6D0`;
 }
 
 export function formatPercent(value: number, digits = 1) {
