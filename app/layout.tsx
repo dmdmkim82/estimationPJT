@@ -4,9 +4,9 @@ import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SOFC Estimate Studio",
+  title: "연료전지 EPC 견적 스튜디오 | Fuel Cell EPC Estimate Studio",
   description:
-    "Workbook-calibrated SOFC EPC estimation experience rebuilt with Next.js.",
+    "연료전지 EPC 견적을 위한 레퍼런스 기반 워크스페이스. Reference-driven fuel-cell EPC estimation workspace with workbook import, escalation logic, risk review, and LCOE comparison.",
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ko">
       <body>
         <SiteHeader />
         {children}
