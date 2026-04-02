@@ -269,6 +269,36 @@ function convertAmountToEok(rawAmount: number, context: string) {
   return magnitude;
 }
 
+function getVisibleSheetNames(workbook: ReturnType<typeof read>) {
+  const sheetMeta = workbook.Workbook?.Sheets ?? [];
+
+  return workbook.SheetNames.filter((sheetName, index) => {
+    const hiddenFlag = sheetMeta[index]?.Hidden;
+    return hiddenFlag !== 1 && hiddenFlag !== 2;
+  });
+}
+
+function getHiddenSheetNames(workbook: ReturnType<typeof read>) {
+  const sheetMeta = workbook.Workbook?.Sheets ?? [];
+
+  return workbook.SheetNames.filter((sheetName, index) => {
+    const hiddenFlag = sheetMeta[index]?.Hidden;
+    return hiddenFlag === 1 || hiddenFlag === 2;
+  });
+}
+
+function countSheetComments(sheet: unknown) {
+  if (!sheet || typeof sheet !== "object") return 0;
+
+  return Object.entries(sheet as Record<string, unknown>).reduce((sum, [cell, value]) => {
+    if (cell.startsWith("!")) return sum;
+    if (!value || typeof value !== "object") return sum;
+
+    const comments = (value as { c?: unknown[] }).c;
+    return sum + (Array.isArray(comments) ? comments.length : 0);
+  }, 0);
+}
+
 function extractWorkbookCorpus(
   fileName: string,
   rowsBySheet: Array<{ sheetName: string; rows: unknown[][] }>,
@@ -435,7 +465,13 @@ export async function inspectReferenceWorkbook(
     cellDates: false,
   });
 
-  const rowsBySheet = workbook.SheetNames.map((sheetName) => ({
+  const visibleSheetNames = getVisibleSheetNames(workbook);
+  const hiddenSheetNames = getHiddenSheetNames(workbook);
+  const commentCount = visibleSheetNames.reduce((sum, sheetName) => {
+    return sum + countSheetComments(workbook.Sheets[sheetName]);
+  }, 0);
+
+  const rowsBySheet = visibleSheetNames.map((sheetName) => ({
     sheetName,
     rows: utils.sheet_to_json(workbook.Sheets[sheetName], {
       header: 1,
@@ -467,6 +503,18 @@ export async function inspectReferenceWorkbook(
   const fallbackName = file.name.replace(/\.[^.]+$/, "");
   const extraWarnings: string[] = [];
 
+  if (hiddenSheetNames.length > 0) {
+    extraWarnings.push(
+      `숨겨진 시트 ${hiddenSheetNames.length}개는 계산에서 제외했습니다: ${hiddenSheetNames.join(", ")}`,
+    );
+  }
+
+  if (commentCount > 0) {
+    extraWarnings.push(
+      `셀 메모/주석 ${commentCount}건은 계산에 반영하지 않았습니다. 필요한 경우 시트 원본을 별도로 확인하세요.`,
+    );
+  }
+
   if (!yearMatch) {
     extraWarnings.push(
       `기준연도를 파일에서 찾지 못해 기본값 ${DEFAULT_REFERENCE_PROJECT.referenceYear}년을 사용합니다.`,
@@ -492,10 +540,19 @@ export async function inspectReferenceWorkbook(
     items: filteredItems,
     notes: [
       `${file.name} 파일에서 가져온 기준서입니다.`,
-      `${rowsBySheet.length}개 시트를 스캔했습니다.`,
+      `${rowsBySheet.length}개 표시 시트를 스캔했습니다.`,
       "연도와 용량은 워크북 텍스트에서 추정했으므로 적용 전 다시 확인하세요.",
     ],
   };
+
+  // 원본 워크북 객체 참조를 지워 세션 메모리에 불필요하게 남지 않도록 정리합니다.
+  Object.keys(workbook.Sheets).forEach((sheetName) => {
+    delete workbook.Sheets[sheetName];
+  });
+  workbook.SheetNames.length = 0;
+  if (workbook.Workbook?.Sheets) {
+    workbook.Workbook.Sheets.length = 0;
+  }
 
   return summarizeReferenceWorkbookInspection(project, {
     fileName: file.name,

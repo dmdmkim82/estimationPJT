@@ -5,8 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 type FontScale = "compact" | "default" | "large";
 type ContrastMode = "soft" | "balanced" | "strong";
 
-const STORAGE_KEY = "sofc-display-config-v1";
-
 const fontOptions: Array<{ value: FontScale; label: string }> = [
   { value: "compact", label: "작게" },
   { value: "default", label: "기본" },
@@ -31,34 +29,11 @@ export function DisplayConfig() {
   const [contrastMode, setContrastMode] = useState<ContrastMode>("balanced");
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (!stored) {
-        applyDisplayConfig("default", "balanced");
-        return;
-      }
-
-      const parsed = JSON.parse(stored) as {
-        fontScale?: FontScale;
-        contrastMode?: ContrastMode;
-      };
-
-      const nextFont = parsed.fontScale ?? "default";
-      const nextContrast = parsed.contrastMode ?? "balanced";
-      setFontScale(nextFont);
-      setContrastMode(nextContrast);
-      applyDisplayConfig(nextFont, nextContrast);
-    } catch {
-      applyDisplayConfig("default", "balanced");
-    }
+    applyDisplayConfig("default", "balanced");
   }, []);
 
   useEffect(() => {
     applyDisplayConfig(fontScale, contrastMode);
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ fontScale, contrastMode }),
-    );
   }, [fontScale, contrastMode]);
 
   const summary = useMemo(() => {

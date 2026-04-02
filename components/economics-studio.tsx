@@ -3,8 +3,10 @@
 import { useState } from "react";
 import {
   calculateEconomics,
+  calculateEconomicsHeatmap,
   calculateEconomicsSensitivity,
   DEFAULT_ECONOMICS_INPUT,
+  type EconomicsHeatmapRow,
   type EconomicsInput,
   type SensitivityAxis,
 } from "@/lib/economics";
@@ -31,6 +33,8 @@ const copy = {
   degradation: "연간 성능 저하 (%)",
   fixedOm: "고정 O&M (%/년)",
   stackReserve: "스택 적립비 (%/년)",
+  stackCycle: "스택 교체 주기 (년)",
+  stackReplacement: "스택 교체비 (원/kW)",
   discount: "할인율 (%)",
   life: "사업기간 (년)",
   debtRatio: "차입비율 (%)",
@@ -52,15 +56,20 @@ const copy = {
   bridgeDesc: "주기기 금액과 EPC 가산으로 총 투자비를 구성합니다.",
   metrics: "핵심 지표",
   metricsDesc: "수익성과 차입 안정성을 한 화면에서 확인합니다.",
+  stackLifecycle: "스택 교체",
+  stackLifecycleDesc: "주기별 교체비 반영 시점을 연간 현금흐름과 함께 확인합니다.",
   annual: "연간 현금흐름",
   annualDesc: "발전량, 매출, EBITDA, 프로젝트 CF, DSCR, 자기자본 CF를 연도별로 표시합니다.",
   sensitivity: "민감도 분석",
   sensitivityDesc: "주요 변수의 상하 변동이 경제성에 미치는 영향을 토네이도 차트로 비교합니다.",
   sensitivityShock: "변동폭 (%)",
+  heatmap: "판매단가 / 연료비 격자",
+  heatmapDesc: "판매단가와 연료비를 동시에 흔든 프로젝트 IRR 격자입니다.",
   sensitivityBase: "기준",
   tornado: "토네이도 차트",
   downside: "하향 시나리오",
   upside: "상향 시나리오",
+  noStackEvents: "현재 가정에서는 스택 교체 이벤트가 없습니다.",
   none: "해당 없음",
 };
 
@@ -159,6 +168,35 @@ function tornadoBarClass(delta: number | null, inverse = false) {
   return positive ? "tornado-bar tornado-bar--positive" : "tornado-bar tornado-bar--negative";
 }
 
+function getHeatmapRange(rows: EconomicsHeatmapRow[]) {
+  const values = rows.flatMap((row) =>
+    row.cells
+      .map((cell) => cell.projectIrrPct)
+      .filter((value): value is number => value !== null),
+  );
+
+  return {
+    min: values.length > 0 ? Math.min(...values) : 0,
+    max: values.length > 0 ? Math.max(...values) : 0,
+  };
+}
+
+function heatmapIntensity(value: number | null, min: number, max: number) {
+  if (value === null) return 0.5;
+  if (Math.abs(max - min) < 0.0001) return 0.5;
+  return (value - min) / (max - min);
+}
+
+function heatmapCellStyle(value: number | null, min: number, max: number) {
+  const intensity = heatmapIntensity(value, min, max);
+  const hue = 12 + intensity * 112;
+  const alpha = 0.18 + intensity * 0.48;
+
+  return {
+    backgroundColor: `hsla(${hue.toFixed(1)}, 72%, 56%, ${alpha.toFixed(3)})`,
+  };
+}
+
 function TornadoPanel({
   title,
   baseLabel,
@@ -224,6 +262,14 @@ export function EconomicsStudio() {
   const [sensitivityShockPct, setSensitivityShockPct] = useState(10);
   const result = calculateEconomics(input);
   const sensitivityAxes = calculateEconomicsSensitivity(input, sensitivityShockPct);
+  const heatmapRows = calculateEconomicsHeatmap(
+    input,
+    sensitivityShockPct,
+    sensitivityShockPct,
+    5,
+  );
+  const heatmapRange = getHeatmapRange(heatmapRows);
+  const stackReplacementRows = result.rows.filter((row) => row.stackReplacementEok > 0);
 
   const lcoeTornado = buildTornadoRows(
     sensitivityAxes,
@@ -418,6 +464,38 @@ export function EconomicsStudio() {
               />
             </label>
             <label className="field">
+              <span>{copy.stackCycle}</span>
+              <input
+                type="number"
+                min="0"
+                max="20"
+                step="1"
+                value={input.stackReplacementCycleYears}
+                onChange={(event) =>
+                  setField(
+                    "stackReplacementCycleYears",
+                    clampNumber(Number(event.target.value), 0, 20),
+                  )
+                }
+              />
+            </label>
+            <label className="field">
+              <span>{copy.stackReplacement}</span>
+              <input
+                type="number"
+                min="0"
+                max="5000000"
+                step="10000"
+                value={input.stackReplacementCostKrwPerKw}
+                onChange={(event) =>
+                  setField(
+                    "stackReplacementCostKrwPerKw",
+                    clampNumber(Number(event.target.value), 0, 5_000_000),
+                  )
+                }
+              />
+            </label>
+            <label className="field">
               <span>{copy.discount}</span>
               <input
                 type="number"
@@ -603,10 +681,33 @@ export function EconomicsStudio() {
                 <strong>{formatMaybeDscr(result.avgDscr)}</strong>
               </div>
               <div className="metric-row">
+                <span>{copy.stackReplacement}</span>
+                <strong>{formatEok(result.stackReplacementEventEok)}</strong>
+              </div>
+              <div className="metric-row">
                 <span>{copy.equityPayback}</span>
                 <strong>{formatMaybeYears(result.equityPaybackYears)}</strong>
               </div>
             </div>
+          </article>
+
+          <article className="panel-surface">
+            <div className="panel-surface__header">
+              <span className="control-label">{copy.stackLifecycle}</span>
+              <h3>{copy.stackLifecycleDesc}</h3>
+            </div>
+            {stackReplacementRows.length === 0 ? (
+              <p className="empty-state">{copy.noStackEvents}</p>
+            ) : (
+              <div className="metric-list">
+                {stackReplacementRows.map((row) => (
+                  <div className="metric-row" key={`stack-${row.year}`}>
+                    <span>{row.year}차년도</span>
+                    <strong>{formatEok(row.stackReplacementEok)}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
           </article>
         </div>
 
@@ -655,6 +756,53 @@ export function EconomicsStudio() {
 
         <article className="panel-surface">
           <div className="panel-surface__header">
+            <span className="control-label">{copy.heatmap}</span>
+            <h3>{copy.heatmapDesc}</h3>
+          </div>
+          <div className="heatmap-wrap">
+            <div
+              className="heatmap-grid"
+              style={{
+                gridTemplateColumns: `120px repeat(${heatmapRows[0]?.cells.length ?? 0}, minmax(92px, 1fr))`,
+              }}
+            >
+              <div className="heatmap-corner">연료비 \\ 판매단가</div>
+              {heatmapRows[0]?.cells.map((cell) => (
+                <div className="heatmap-axis heatmap-axis--top" key={`tariff-${cell.tariffKrwPerKwh}`}>
+                  {cell.tariffKrwPerKwh.toFixed(0)}
+                </div>
+              ))}
+              {heatmapRows.map((row) => (
+                <div
+                  className="heatmap-row-group"
+                  key={`row-${row.fuelCostKrwPerKwh}`}
+                  style={{ display: "contents" }}
+                >
+                  <div className="heatmap-axis heatmap-axis--left">
+                    {row.fuelCostKrwPerKwh.toFixed(0)}
+                  </div>
+                  {row.cells.map((cell) => (
+                    <div
+                      className="heatmap-cell"
+                      key={`cell-${row.fuelCostKrwPerKwh}-${cell.tariffKrwPerKwh}`}
+                      style={heatmapCellStyle(
+                        cell.projectIrrPct,
+                        heatmapRange.min,
+                        heatmapRange.max,
+                      )}
+                    >
+                      <strong>{formatMaybePercent(cell.projectIrrPct)}</strong>
+                      <small>{cell.lcoeKrwPerKwh.toFixed(1)} 원/kWh</small>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </article>
+
+        <article className="panel-surface">
+          <div className="panel-surface__header">
             <span className="control-label">{copy.annual}</span>
             <h3>{copy.annualDesc}</h3>
           </div>
@@ -666,6 +814,7 @@ export function EconomicsStudio() {
                   <th>발전량</th>
                   <th>매출</th>
                   <th>운영비</th>
+                  <th>스택 교체</th>
                   <th>EBITDA</th>
                   <th>프로젝트 CF</th>
                   <th>차입 상환</th>
@@ -681,6 +830,7 @@ export function EconomicsStudio() {
                     <td>{row.generationMWh.toLocaleString("en-US")} MWh</td>
                     <td className={cashflowClass(row.revenueEok)}>{formatEok(row.revenueEok)}</td>
                     <td>{formatEok(row.opexEok)}</td>
+                    <td>{formatEok(row.stackReplacementEok)}</td>
                     <td className={cashflowClass(row.ebitdaEok)}>{formatEok(row.ebitdaEok)}</td>
                     <td className={cashflowClass(row.projectCashFlowEok)}>
                       {formatEok(row.projectCashFlowEok)}
@@ -703,4 +853,3 @@ export function EconomicsStudio() {
     </div>
   );
 }
-

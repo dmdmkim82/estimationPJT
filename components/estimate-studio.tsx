@@ -34,9 +34,6 @@ import {
   type RiskFinding,
 } from "@/lib/estimator";
 
-const STORAGE_KEY = "fuel-cell-epc-reference-db-v1";
-const HISTORY_STORAGE_KEY = "fuel-cell-epc-history-v1";
-const MONTE_CARLO_STORAGE_KEY = "fuel-cell-epc-monte-carlo-v1";
 const HISTORY_LIMIT = 20;
 
 const copy = {
@@ -44,6 +41,13 @@ const copy = {
   importing: "워크북을 불러오는 중...",
   uploadWorkbook: "기준 워크북 업로드",
   localParse: "Excel 파일을 브라우저에서 바로 읽습니다.",
+  uploadTrustTitle: "파일 처리 안내",
+  uploadTrustPrimary: "업로드된 파일은 브라우저에서만 처리되며 외부로 전송되지 않습니다.",
+  uploadTrustSecondary:
+    "지도와 참고 시세만 브라우저가 외부 원문을 직접 참조합니다. 업로드 파일 내용은 포함되지 않습니다.",
+  uploadTrustTertiary:
+    "내부 검토 시에는 확장 프로그램이 없는 시크릿 모드 사용을 권장합니다.",
+  uploadTrustQuaternary: "민감한 작업 후에는 브라우저를 완전히 종료하세요.",
   eok: "억원",
   basis: "기준으로",
   resultTail: "를 반영한 결과입니다.",
@@ -128,6 +132,9 @@ const copy = {
   mapContext: "지도 기준 검토",
   mapContextTitle: "위치 기반 현장 검토 프레임",
   mapPreviewTitle: "현장 위치 미리보기",
+  mapExternalNote:
+    "지도는 브라우저가 외부 지도를 직접 불러옵니다. 업로드 파일 내용은 지도 호출에 포함되지 않습니다.",
+  mapEmpty: "주소 또는 좌표를 입력하면 브라우저에서 현장 위치를 바로 확인할 수 있습니다.",
   virtualLayout: "가상 배치",
   virtualLayoutTitle: "예상 플랜트 배치",
   estimatedLandUse: "예상 필요 면적",
@@ -267,58 +274,6 @@ export function EstimateStudio() {
     ),
   );
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return;
-
-    try {
-      const parsed = JSON.parse(stored) as ReferenceProject[];
-      if (Array.isArray(parsed)) setUploadedReferences(parsed);
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(uploadedReferences));
-  }, [uploadedReferences]);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(HISTORY_STORAGE_KEY);
-    if (!stored) return;
-
-    try {
-      const parsed = JSON.parse(stored) as EstimateHistorySnapshot[];
-      if (Array.isArray(parsed)) setHistorySnapshots(parsed);
-    } catch {
-      window.localStorage.removeItem(HISTORY_STORAGE_KEY);
-    }
-  }, []);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(MONTE_CARLO_STORAGE_KEY);
-    if (!stored) return;
-
-    try {
-      const parsed = JSON.parse(stored) as EstimateUncertaintyProfile;
-      if (parsed && typeof parsed === "object") {
-        setUncertaintyProfile({
-          S: clampNumber(Number(parsed.S), 0, 50),
-          P: clampNumber(Number(parsed.P), 0, 50),
-          C: clampNumber(Number(parsed.C), 0, 50),
-          site: clampNumber(Number(parsed.site), 0, 50),
-          drawing: clampNumber(Number(parsed.drawing), 0, 50),
-        });
-      }
-    } catch {
-      window.localStorage.removeItem(MONTE_CARLO_STORAGE_KEY);
-    }
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(MONTE_CARLO_STORAGE_KEY, JSON.stringify(uncertaintyProfile));
-  }, [uncertaintyProfile]);
-
   const referenceProjects = [...DEFAULT_REFERENCE_DATABASE, ...uploadedReferences];
   const selectedReference =
     referenceProjects.find((project) => project.id === selectedReferenceId) ??
@@ -351,6 +306,19 @@ export function EstimateStudio() {
     input.inflation,
   );
   const isBuyerMode = viewMode === "buyer";
+  const hasCoordinates =
+    Number.isFinite(input.latitude) &&
+    Number.isFinite(input.longitude) &&
+    (Math.abs(input.latitude) > 0.0001 || Math.abs(input.longitude) > 0.0001);
+  const hasAddress = input.siteAddress.trim().length > 0;
+  const mapQuery = hasCoordinates
+    ? `${input.latitude},${input.longitude}`
+    : hasAddress
+      ? input.siteAddress.trim()
+      : "";
+  const mapEmbedUrl = mapQuery
+    ? `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=14&output=embed`
+    : null;
   const selectedProjectOption =
     PROJECT_OPTIONS.find((option) => option.id === input.projectType) ?? PROJECT_OPTIONS[0];
   const summaryCards = [
@@ -441,7 +409,6 @@ export function EstimateStudio() {
         0,
         HISTORY_LIMIT,
       );
-      window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   }, [
@@ -595,7 +562,6 @@ export function EstimateStudio() {
   };
 
   const clearHistorySnapshots = () => {
-    window.localStorage.removeItem(HISTORY_STORAGE_KEY);
     setHistorySnapshots([]);
   };
 
@@ -762,12 +728,20 @@ export function EstimateStudio() {
               />
               <span>{isImporting ? copy.importing : copy.uploadWorkbook}</span>
               <small>{copy.localParse}</small>
-            </label>
+              </label>
 
-            {importError ? <p className="feedback feedback--error">{importError}</p> : null}
+              {importError ? <p className="feedback feedback--error">{importError}</p> : null}
 
-            <div className="reference-library">
-              {referenceProjects.map((project) => (
+              <div className="upload-trust" role="note" aria-label={copy.uploadTrustTitle}>
+                <strong>{copy.uploadTrustTitle}</strong>
+                <p>{copy.uploadTrustPrimary}</p>
+                <p>{copy.uploadTrustSecondary}</p>
+                <p>{copy.uploadTrustTertiary}</p>
+                <p>{copy.uploadTrustQuaternary}</p>
+              </div>
+
+              <div className="reference-library">
+                {referenceProjects.map((project) => (
                 <article
                   key={project.id}
                   className={
@@ -1571,11 +1545,22 @@ export function EstimateStudio() {
                 <span className="control-label">{copy.mapContext}</span>
                 <h3>{copy.mapContextTitle}</h3>
               </div>
-              <div className="detail-list">
-                <div className="detail-list__row">
-                  <strong>{copy.mapPreviewTitle}</strong>
-                  <span>내부망 전용 모드에서는 외부 지도 호출 없이 현장 정보만 표시합니다.</span>
+              {mapEmbedUrl ? (
+                <div className="map-frame">
+                  <iframe
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    src={mapEmbedUrl}
+                    title={copy.mapPreviewTitle}
+                  />
                 </div>
+              ) : (
+                <div className="map-frame map-frame--placeholder">
+                  <p>{copy.mapEmpty}</p>
+                </div>
+              )}
+              <p className="map-frame__note">{copy.mapExternalNote}</p>
+              <div className="detail-list">
                 <div className="detail-list__row">
                   <strong>현장명</strong>
                   <span>{input.siteName}</span>
@@ -1592,7 +1577,7 @@ export function EstimateStudio() {
                 </div>
               </div>
               <div className="tag-row">
-                <span className="tag">내부망 전용</span>
+                <span className="tag">브라우저 직접 조회</span>
                 <span className="tag">{input.siteName}</span>
                 <span className="tag">{input.siteAddress}</span>
               </div>

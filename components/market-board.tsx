@@ -1,13 +1,17 @@
-import { getMarketBoardItems } from "@/lib/market-board";
+"use client";
+
+import { useEffect, useState } from "react";
+import { DEFAULT_MARKET_BOARD, type MarketBoardItem, type TrendDirection } from "@/lib/market-board";
 
 const copy = {
-  title: "\uAC74\uC124\uBE44 \uC804\uAD11\uD310",
-  subtitle: "\uC0AC\uB0B4 \uC790\uB8CC \uC785\uB825 \uBCF4\uB4DC",
-  note: "\uB9E4\uC77C 1\uD68C \uC790\uB3D9 \uAC31\uC2E0",
-  note2: "\uB0B4\uBD80\uB9DD \uC804\uC6A9",
-  live: "\uB0B4\uBD80 \uBC18\uC601",
-  fallback: "\uC790\uB8CC \uB300\uAE30",
-  source: "\uCD9C\uCC98",
+  title: "건설비 전광판",
+  subtitle: "브라우저 참조 보드",
+  note: "브라우저 직접 조회",
+  note2: "파일 데이터 제외",
+  live: "실시간 반영",
+  fallback: "브라우저 참조",
+  source: "출처",
+  open: "열기",
 };
 
 function buildSparklinePath(points: number[]) {
@@ -26,8 +30,110 @@ function buildSparklinePath(points: number[]) {
     .join(" ");
 }
 
-export async function MarketBoard() {
-  const items = await getMarketBoardItems();
+function shiftDate(base: Date, months: number) {
+  const next = new Date(base);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
+function toIsoDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function formatPct(current: number, previous: number) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous) || previous === 0) {
+    return { text: "참조 링크", direction: "flat" as TrendDirection };
+  }
+
+  const pct = ((current - previous) / previous) * 100;
+  const direction: TrendDirection = pct > 0.05 ? "up" : pct < -0.05 ? "down" : "flat";
+  const sign = pct > 0 ? "+" : "";
+
+  return {
+    text: `${sign}${pct.toFixed(1)}%`,
+    direction,
+  };
+}
+
+async function fetchFxRate(date?: Date) {
+  const path = date ? toIsoDate(date) : "latest";
+  const response = await fetch(`https://api.frankfurter.app/${path}?from=USD&to=KRW`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`FX request failed: ${response.status}`);
+  }
+
+  const json = (await response.json()) as { amount?: number; date?: string; rates?: Record<string, number> };
+  const rate = json.rates?.KRW;
+  if (!rate || !Number.isFinite(rate)) {
+    throw new Error("FX rate missing");
+  }
+
+  return {
+    rate,
+    date: json.date ?? toIsoDate(date ?? new Date()),
+  };
+}
+
+export function MarketBoard() {
+  const [items, setItems] = useState<MarketBoardItem[]>(DEFAULT_MARKET_BOARD);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFx() {
+      try {
+        const today = new Date();
+        const monthAgo = shiftDate(today, -1);
+        const yearAgo = shiftDate(today, -12);
+        const sparkDates = Array.from({ length: 8 }, (_, index) =>
+          shiftDate(today, index - 7),
+        );
+
+        const [current, month, year, ...sparkValues] = await Promise.all([
+          fetchFxRate(),
+          fetchFxRate(monthAgo),
+          fetchFxRate(yearAgo),
+          ...sparkDates.map((date) => fetchFxRate(date)),
+        ]);
+
+        if (cancelled) return;
+
+        const monthChange = formatPct(current.rate, month.rate);
+        const yearChange = formatPct(current.rate, year.rate);
+
+        setItems((currentItems) =>
+          currentItems.map((item) =>
+            item.id !== "fx"
+              ? item
+              : {
+                  ...item,
+                  value: current.rate.toLocaleString("ko-KR", {
+                    maximumFractionDigits: 2,
+                    minimumFractionDigits: 2,
+                  }),
+                  monthText: monthChange.text,
+                  monthDirection: monthChange.direction,
+                  yearText: yearChange.text,
+                  yearDirection: yearChange.direction,
+                  updatedAt: current.date,
+                  points: sparkValues.map((entry) => entry.rate),
+                  live: true,
+                },
+          ),
+        );
+      } catch {
+        if (cancelled) return;
+      }
+    }
+
+    loadFx();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <section aria-label={copy.title} className="market-board">
@@ -101,10 +207,20 @@ export async function MarketBoard() {
                 <div className="market-card__footer">
                   <span>{`${item.cadence} / ${item.updatedAt}`}</span>
                   <div className="market-card__links">
-                    <span className="market-card__source">
-                      {copy.source}
-                      <small>{item.sourceLabel}</small>
-                    </span>
+                    {item.sourceUrl ? (
+                      <a href={item.sourceUrl} rel="noreferrer" target="_blank">
+                        <span className="market-card__source">
+                          {copy.source}
+                          <small>{item.sourceLabel}</small>
+                        </span>
+                        <small>{copy.open}</small>
+                      </a>
+                    ) : (
+                      <span className="market-card__source">
+                        {copy.source}
+                        <small>{item.sourceLabel}</small>
+                      </span>
+                    )}
                   </div>
                 </div>
               </article>

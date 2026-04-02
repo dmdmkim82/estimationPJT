@@ -17,7 +17,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <head />
+      <head>
+        <meta content="no-referrer" name="referrer" />
+      </head>
       <body>
         <SiteHeader />
         {children}

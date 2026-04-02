@@ -2013,6 +2013,61 @@ body {
   text-align: left;
 }
 
+.heatmap-wrap {
+  overflow-x: auto;
+}
+
+.heatmap-grid {
+  display: grid;
+  gap: 10px;
+  min-width: 640px;
+  align-items: stretch;
+}
+
+.heatmap-corner,
+.heatmap-axis,
+.heatmap-cell {
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.heatmap-corner,
+.heatmap-axis {
+  display: grid;
+  place-items: center;
+  min-height: 58px;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.heatmap-axis--top,
+.heatmap-axis--left {
+  color: var(--ink);
+}
+
+.heatmap-cell {
+  display: grid;
+  gap: 6px;
+  min-height: 92px;
+  padding: 14px 12px;
+  align-content: center;
+  text-align: center;
+}
+
+.heatmap-cell strong {
+  font-size: 1rem;
+  letter-spacing: -0.03em;
+}
+
+.heatmap-cell small {
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 0.76rem;
+}
+
 .scenario-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2659,6 +2714,27 @@ textarea {
   line-height: 1.65;
 }
 
+.upload-trust {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(108, 133, 160, 0.08);
+  border: 1px solid rgba(22, 32, 45, 0.08);
+}
+
+.upload-trust strong {
+  font-size: 0.86rem;
+  letter-spacing: -0.02em;
+}
+
+.upload-trust p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
 .reference-card {
   padding: 18px;
   border-radius: 22px;
@@ -2769,6 +2845,26 @@ textarea {
 .map-frame {
   min-height: 360px;
   overflow: hidden;
+}
+
+.map-frame--placeholder {
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.map-frame--placeholder p,
+.map-frame__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.map-frame__note {
+  margin-top: 12px;
 }
 
 .table th {

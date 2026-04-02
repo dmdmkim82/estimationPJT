@@ -9,6 +9,8 @@ export type EconomicsInput = {
   degradationRatePct: number;
   fixedOandMRatePct: number;
   stackReserveRatePct: number;
+  stackReplacementCycleYears: number;
+  stackReplacementCostKrwPerKw: number;
   discountRatePct: number;
   projectLifeYears: number;
   debtRatioPct: number;
@@ -22,6 +24,7 @@ export type EconomicsYearRow = {
   generationMWh: number;
   revenueEok: number;
   opexEok: number;
+  stackReplacementEok: number;
   ebitdaEok: number;
   projectCashFlowEok: number;
   debtServiceEok: number;
@@ -40,6 +43,7 @@ export type EconomicsResult = {
   annualGenerationMWhYear1: number;
   annualRevenueEokYear1: number;
   annualOpexEokYear1: number;
+  stackReplacementEventEok: number;
   annualEbitdaEokYear1: number;
   lcoeKrwPerKwh: number;
   projectIrrPct: number | null;
@@ -50,6 +54,18 @@ export type EconomicsResult = {
   avgDscr: number | null;
   annualDebtServiceEok: number;
   rows: EconomicsYearRow[];
+};
+
+export type EconomicsHeatmapCell = {
+  tariffKrwPerKwh: number;
+  fuelCostKrwPerKwh: number;
+  projectIrrPct: number | null;
+  lcoeKrwPerKwh: number;
+};
+
+export type EconomicsHeatmapRow = {
+  fuelCostKrwPerKwh: number;
+  cells: EconomicsHeatmapCell[];
 };
 
 export type SensitivityTarget =
@@ -98,6 +114,8 @@ export const DEFAULT_ECONOMICS_INPUT: EconomicsInput = {
   degradationRatePct: 0.4,
   fixedOandMRatePct: 2.5,
   stackReserveRatePct: 1.5,
+  stackReplacementCycleYears: 5,
+  stackReplacementCostKrwPerKw: 0,
   discountRatePct: 6,
   projectLifeYears: 20,
   debtRatioPct: 65,
@@ -218,6 +236,8 @@ export function calculateEconomics(input: EconomicsInput): EconomicsResult {
   const totalCapexEok = mainEquipmentCapexEok + epcAdderEok;
   const debtAmountEok = totalCapexEok * (input.debtRatioPct / 100);
   const equityAmountEok = totalCapexEok - debtAmountEok;
+  const stackReplacementEventEok =
+    (input.capacityMw * 1000 * input.stackReplacementCostKrwPerKw) / 100_000_000;
   const annualDebtServiceEok = calculateAnnuityPayment(
     debtAmountEok,
     input.debtInterestRatePct / 100,
@@ -246,7 +266,13 @@ export function calculateEconomics(input: EconomicsInput): EconomicsResult {
     const revenueEok = (generationKwh * input.tariffKrwPerKwh) / 100_000_000;
     const fuelCostEok = (generationKwh * input.fuelCostKrwPerKwh) / 100_000_000;
     const fixedCostEok = totalCapexEok * fixedCostRate;
-    const opexEok = fuelCostEok + fixedCostEok;
+    const stackReplacementEok =
+      input.stackReplacementCycleYears > 0 &&
+      input.stackReplacementCostKrwPerKw > 0 &&
+      year % input.stackReplacementCycleYears === 0
+        ? stackReplacementEventEok
+        : 0;
+    const opexEok = fuelCostEok + fixedCostEok + stackReplacementEok;
     const ebitdaEok = revenueEok - opexEok;
     const taxableIncomeEok = Math.max(0, ebitdaEok - depreciationEok);
     const taxEok = taxableIncomeEok * (input.taxRatePct / 100);
@@ -283,6 +309,7 @@ export function calculateEconomics(input: EconomicsInput): EconomicsResult {
       generationMWh: round(generationMWh, 0),
       revenueEok: round(revenueEok, 2),
       opexEok: round(opexEok, 2),
+      stackReplacementEok: round(stackReplacementEok, 2),
       ebitdaEok: round(ebitdaEok, 2),
       projectCashFlowEok: round(projectCashFlowEok, 2),
       debtServiceEok: round(debtServiceEok, 2),
@@ -306,6 +333,7 @@ export function calculateEconomics(input: EconomicsInput): EconomicsResult {
     annualGenerationMWhYear1: rows[0]?.generationMWh ?? 0,
     annualRevenueEokYear1: rows[0]?.revenueEok ?? 0,
     annualOpexEokYear1: rows[0]?.opexEok ?? 0,
+    stackReplacementEventEok: round(stackReplacementEventEok, 2),
     annualEbitdaEokYear1: rows[0]?.ebitdaEok ?? 0,
     lcoeKrwPerKwh: round(discountedCostsKrw / Math.max(1, discountedGenerationKwh), 1),
     projectIrrPct: (() => {
@@ -395,6 +423,50 @@ export function calculateEconomicsSensitivity(
       projectIrrSwingPct: getIrrSwing(upResult.projectIrrPct, downResult.projectIrrPct),
     };
   });
+}
+
+export function calculateEconomicsHeatmap(
+  input: EconomicsInput,
+  tariffShockPct: number,
+  fuelShockPct: number,
+  steps = 5,
+): EconomicsHeatmapRow[] {
+  const size = clampValue(Math.round(steps), 3, 9);
+  const offsets = Array.from({ length: size }, (_, index) =>
+    size === 1 ? 0 : (index / (size - 1) - 0.5) * 2,
+  );
+  const tariffs = offsets.map((offset) =>
+    round(
+      clampValue(input.tariffKrwPerKwh * (1 + (tariffShockPct / 100) * offset), 0, 1000),
+      0,
+    ),
+  );
+  const fuels = [...offsets]
+    .reverse()
+    .map((offset) =>
+      round(
+        clampValue(input.fuelCostKrwPerKwh * (1 + (fuelShockPct / 100) * offset), 0, 1000),
+        0,
+      ),
+    );
+
+  return fuels.map((fuelCostKrwPerKwh) => ({
+    fuelCostKrwPerKwh,
+    cells: tariffs.map((tariffKrwPerKwh) => {
+      const result = calculateEconomics({
+        ...input,
+        tariffKrwPerKwh,
+        fuelCostKrwPerKwh,
+      });
+
+      return {
+        tariffKrwPerKwh,
+        fuelCostKrwPerKwh,
+        projectIrrPct: result.projectIrrPct,
+        lcoeKrwPerKwh: result.lcoeKrwPerKwh,
+      };
+    }),
+  }));
 }
 
 function scalePercentField(value: number, shockPct: number, direction: "up" | "down") {
