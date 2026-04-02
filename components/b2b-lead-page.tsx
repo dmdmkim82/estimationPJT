@@ -19,32 +19,53 @@ const DEFAULT_FORM: B2BLeadInput = {
 };
 
 const copy = {
-  input: "B2B \uC785\uB825",
-  siteQuick: "\uBD80\uC9C0 \uAE30\uBC18 \uBE60\uB978 \uC81C\uC548",
-  siteQuickDesc:
-    "\uC8FC\uC18C\uC640 \uBA74\uC801\uB9CC \uB123\uC73C\uBA74 1\uCC28 \uC81C\uC548 \uAE08\uC561\uC744 \uACC4\uC0B0\uD569\uB2C8\uB2E4.",
-  googleCoords: "\uCE21\uC815 \uC88C\uD45C\uB97C \uBD99\uC5EC\uB123\uC2B5\uB2C8\uB2E4.",
-  cadastralCoords:
-    "\uC9C0\uC801\uB3C4 \uACBD\uACC4 \uC88C\uD45C\uB97C \uBD99\uC5EC\uB123\uC2B5\uB2C8\uB2E4.",
-  manualDims: "\uAC00\uB85C x \uC138\uB85C\uB9CC\uC73C\uB85C \uACC4\uC0B0\uD569\uB2C8\uB2E4.",
-  hint: "Google Maps \uB610\uB294 \uC9C0\uC801\uB3C4 \uC88C\uD45C\uB97C \uADF8\uB300\uB85C \uBD99\uC5EC\uB123\uC73C\uC138\uC694.",
-  calcProposal: "\uC81C\uC548 \uACC4\uC0B0",
-  calcFallback:
-    "\uC88C\uD45C\uAC00 \uC5C6\uC73C\uBA74 \uAC00\uB85C x \uC138\uB85C \uAE30\uC900\uC73C\uB85C \uACC4\uC0B0\uD569\uB2C8\uB2E4.",
-  emptyTitle:
-    "\uBD80\uC9C0 \uC815\uBCF4\uB97C \uB123\uACE0 \uBC14\uB85C 1\uCC28 \uC81C\uC548\uC744 \uACC4\uC0B0\uD558\uC138\uC694.",
-  emptyDesc:
-    "\uC601\uC5C5 \uCD08\uAE30 \uB2E8\uACC4\uC5D0\uC11C \uBA74\uC801, \uAD8C\uC7A5 \uC6A9\uB7C9, \uC608\uBE44 EPC \uAE08\uC561\uC744 \uBE60\uB974\uAC8C \uD655\uC778\uD569\uB2C8\uB2E4.",
-  grossSitePrefix: "\uCD1D \uBD80\uC9C0",
-  basis: "\uAE30\uC900\uC73C\uB85C",
-  stdProposal: "\uD45C\uC900 9.9MW \uC81C\uC548\uC744 \uAD8C\uC7A5\uD569\uB2C8\uB2E4.",
-  scaleProposal: "\uADDC\uBAA8\uB97C \uAD8C\uC7A5\uD569\uB2C8\uB2E4.",
-  grossArea: "\uCD1D \uBA74\uC801",
-  usableArea: "\uC720\uD6A8 \uBA74\uC801",
-  risk: "\uB9AC\uC2A4\uD06C",
-  quickSales: "\uCD08\uAE30 \uC601\uC5C5 \uAC80\uD1A0\uC6A9 \uAE08\uC561",
-  areaSizing: "\uBA74\uC801\uACFC \uC6A9\uB7C9 \uD310\uB2E8",
-  salesMemo: "\uC601\uC5C5 \uBA54\uBAA8",
+  input: "B2B 입력",
+  siteQuick: "부지 기반 빠른 제안",
+  siteQuickDesc: "주소와 면적만 넣으면 1차 제안 금액을 계산합니다.",
+  googleCoords: "측정 좌표를 붙여 넣습니다.",
+  cadastralCoords: "지적도 경계 좌표를 붙여 넣습니다.",
+  manualDims: "가로 x 세로로 계산합니다.",
+  hint: "구글 지도 또는 지적도 좌표를 그대로 붙여 넣으세요.",
+  calcProposal: "제안 계산",
+  calcFallback: "좌표가 없으면 가로 x 세로 기준으로 계산합니다.",
+  emptyTitle: "부지 정보를 넣고 바로 1차 제안을 계산하세요.",
+  emptyDesc: "영업 초기 단계에서 면적, 권장 용량, 예비 EPC 금액을 빠르게 확인합니다.",
+  grossSitePrefix: "총 부지",
+  basis: "기준으로",
+  stdProposal: "표준 9.9MW 제안을 권장합니다.",
+  scaleProposal: "면적 기준으로 규모를 권장합니다.",
+  grossArea: "총 면적",
+  usableArea: "유효 면적",
+  risk: "리스크",
+  quickSales: "초기 영업 검토용 금액",
+  areaSizing: "면적과 용량 판단",
+  salesMemo: "영업 메모",
+  company: "회사명",
+  contact: "담당자명",
+  email: "이메일",
+  phone: "전화번호",
+  siteAddress: "부지 주소",
+  boundary: "경계 좌표 (한 줄에 lat,lng)",
+  width: "가로 (m)",
+  depth: "세로 (m)",
+  landUse: "유효 부지 비율 (%)",
+  startYear: "희망 착공연도",
+  quickProposal: "빠른 제안",
+  leadProposal: "제안 결과",
+  proposalBasis: "제안 기준",
+  requestSummary: "요청 요약",
+  grossSiteArea: "총 부지 면적",
+  usableSiteArea: "유효 부지 면적",
+  recommendedCapacity: "권장 용량",
+  preliminaryQuote: "예비 EPC 금액",
+  utilizationApplied: "유효 비율 적용",
+  standardCap: "표준 제안은 9.9MW 상한 적용",
+  areaBased: "면적 기준 권장 용량",
+  noteLabel: "메모",
+  boundaryPoints: "경계 좌표 수",
+  boundaryDetected: "개 좌표를 읽었습니다.",
+  boundaryRequired: "경계 좌표 또는 가로/세로 값이 필요합니다.",
+  siteAddressRequired: "부지 주소를 입력해야 합니다.",
 };
 
 function clampNumber(value: number, min: number, max: number) {
@@ -55,9 +76,7 @@ function clampNumber(value: number, min: number, max: number) {
 export function B2BLeadPage() {
   const [form, setForm] = useState<B2BLeadInput>(DEFAULT_FORM);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ReturnType<typeof buildB2BLeadProposal> | null>(
-    null,
-  );
+  const [result, setResult] = useState<ReturnType<typeof buildB2BLeadProposal> | null>(null);
 
   const setField = <K extends keyof B2BLeadInput,>(key: K, value: B2BLeadInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -65,12 +84,12 @@ export function B2BLeadPage() {
 
   const handleCalculate = () => {
     if (!form.boundaryText.trim() && !(form.widthM > 0 && form.depthM > 0)) {
-      setError("Boundary coordinates or width/depth values are required.");
+      setError(copy.boundaryRequired);
       return;
     }
 
     if (!form.siteAddress.trim()) {
-      setError("Site address is required.");
+      setError(copy.siteAddressRequired);
       return;
     }
 
@@ -80,14 +99,14 @@ export function B2BLeadPage() {
 
   const leadSummary = result
     ? [
-        `Company: ${form.companyName || "-"}`,
-        `Contact: ${form.contactName || "-"} / ${form.email || "-"} / ${form.phone || "-"}`,
-        `Site: ${form.siteAddress}`,
-        `Gross area: ${result.areaSqm.toLocaleString("en-US")} m2 (${result.areaPyeong.toLocaleString("en-US")} pyeong)`,
-        `Usable area: ${result.usableAreaSqm.toLocaleString("en-US")} m2`,
-        `Recommended capacity: ${result.recommendedCapacityMw.toFixed(1)} MW`,
-        `Preliminary EPC quote: ${formatEok(result.estimate.grandTotal)}`,
-        `Risk grade: ${result.estimate.riskGrade}`,
+        `회사명: ${form.companyName || "-"}`,
+        `담당자: ${form.contactName || "-"} / ${form.email || "-"} / ${form.phone || "-"}`,
+        `부지: ${form.siteAddress}`,
+        `총 면적: ${result.areaSqm.toLocaleString("en-US")} m2 (${result.areaPyeong.toLocaleString("en-US")} 평)`,
+        `유효 면적: ${result.usableAreaSqm.toLocaleString("en-US")} m2`,
+        `권장 용량: ${result.recommendedCapacityMw.toFixed(1)} MW`,
+        `예비 EPC 금액: ${formatEok(result.estimate.grandTotal)}`,
+        `리스크 등급: ${result.estimate.riskGrade}`,
       ].join("\n")
     : "";
 
@@ -111,7 +130,7 @@ export function B2BLeadPage() {
               type="button"
               onClick={() => setField("areaSource", "google")}
             >
-              <strong>Google Maps</strong>
+              <strong>구글 지도</strong>
               <span>{copy.googleCoords}</span>
             </button>
             <button
@@ -123,7 +142,7 @@ export function B2BLeadPage() {
               type="button"
               onClick={() => setField("areaSource", "cadastral")}
             >
-              <strong>Government cadastral</strong>
+              <strong>지적도 좌표</strong>
               <span>{copy.cadastralCoords}</span>
             </button>
             <button
@@ -135,7 +154,7 @@ export function B2BLeadPage() {
               type="button"
               onClick={() => setField("areaSource", "manual")}
             >
-              <strong>Manual dimensions</strong>
+              <strong>수동 입력</strong>
               <span>{copy.manualDims}</span>
             </button>
           </div>
@@ -144,7 +163,7 @@ export function B2BLeadPage() {
         <div className="control-group">
           <div className="field-grid field-grid--two">
             <label className="field">
-              <span>Company</span>
+              <span>{copy.company}</span>
               <input
                 type="text"
                 value={form.companyName}
@@ -152,7 +171,7 @@ export function B2BLeadPage() {
               />
             </label>
             <label className="field">
-              <span>Contact name</span>
+              <span>{copy.contact}</span>
               <input
                 type="text"
                 value={form.contactName}
@@ -160,7 +179,7 @@ export function B2BLeadPage() {
               />
             </label>
             <label className="field">
-              <span>Email</span>
+              <span>{copy.email}</span>
               <input
                 type="email"
                 value={form.email}
@@ -168,7 +187,7 @@ export function B2BLeadPage() {
               />
             </label>
             <label className="field">
-              <span>Phone</span>
+              <span>{copy.phone}</span>
               <input
                 type="text"
                 value={form.phone}
@@ -176,7 +195,7 @@ export function B2BLeadPage() {
               />
             </label>
             <label className="field field--full">
-              <span>Site address</span>
+              <span>{copy.siteAddress}</span>
               <input
                 type="text"
                 value={form.siteAddress}
@@ -184,7 +203,7 @@ export function B2BLeadPage() {
               />
             </label>
             <label className="field field--full">
-              <span>Boundary coordinates (lat,lng per line)</span>
+              <span>{copy.boundary}</span>
               <textarea
                 className="field__textarea"
                 placeholder={
@@ -196,7 +215,7 @@ export function B2BLeadPage() {
               <small className="field-hint">{copy.hint}</small>
             </label>
             <label className="field">
-              <span>Width (m)</span>
+              <span>{copy.width}</span>
               <input
                 type="number"
                 min="0"
@@ -208,7 +227,7 @@ export function B2BLeadPage() {
               />
             </label>
             <label className="field">
-              <span>Depth (m)</span>
+              <span>{copy.depth}</span>
               <input
                 type="number"
                 min="0"
@@ -220,7 +239,7 @@ export function B2BLeadPage() {
               />
             </label>
             <label className="field">
-              <span>Usable land factor (%)</span>
+              <span>{copy.landUse}</span>
               <input
                 type="number"
                 min="30"
@@ -228,15 +247,12 @@ export function B2BLeadPage() {
                 step="1"
                 value={form.landUseFactorPct}
                 onChange={(event) =>
-                  setField(
-                    "landUseFactorPct",
-                    clampNumber(Number(event.target.value), 30, 95),
-                  )
+                  setField("landUseFactorPct", clampNumber(Number(event.target.value), 30, 95))
                 }
               />
             </label>
             <label className="field">
-              <span>Preferred start year</span>
+              <span>{copy.startYear}</span>
               <input
                 type="number"
                 min="2025"
@@ -267,7 +283,7 @@ export function B2BLeadPage() {
       <section className="estimate-results">
         {!result ? (
           <article className="panel-surface b2b-empty">
-            <span className="control-label">Quick Proposal</span>
+            <span className="control-label">{copy.quickProposal}</span>
             <h3>{copy.emptyTitle}</h3>
             <p>{copy.emptyDesc}</p>
           </article>
@@ -275,14 +291,12 @@ export function B2BLeadPage() {
           <>
             <div className="result-main">
               <div className="result-main__copy">
-                <span className="control-label">Lead Proposal</span>
+                <span className="control-label">{copy.leadProposal}</span>
                 <h2>{formatEok(result.estimate.grandTotal)}</h2>
                 <p>
                   {copy.grossSitePrefix} {result.areaSqm.toLocaleString("en-US")} m2 {copy.basis}{" "}
                   <strong>{result.recommendedCapacityMw.toFixed(1)}MW</strong>{" "}
-                  {result.isStandardProposal
-                    ? copy.stdProposal
-                    : copy.scaleProposal}
+                  {result.isStandardProposal ? copy.stdProposal : copy.scaleProposal}
                 </p>
               </div>
               <div className="result-main__meta">
@@ -303,30 +317,28 @@ export function B2BLeadPage() {
 
             <div className="summary-grid summary-grid--wide">
               <article className="summary-card">
-                <span className="summary-card__label">Gross site area</span>
+                <span className="summary-card__label">{copy.grossSiteArea}</span>
                 <strong>{result.areaSqm.toLocaleString("en-US")} m2</strong>
                 <span className="summary-card__sub">
-                  {result.areaPyeong.toLocaleString("en-US")} pyeong
+                  {result.areaPyeong.toLocaleString("en-US")} 평
                 </span>
               </article>
               <article className="summary-card">
-                <span className="summary-card__label">Usable site area</span>
+                <span className="summary-card__label">{copy.usableSiteArea}</span>
                 <strong>{result.usableAreaSqm.toLocaleString("en-US")} m2</strong>
                 <span className="summary-card__sub">
-                  {formatPercent(form.landUseFactorPct)} utilization factor applied
+                  {formatPercent(form.landUseFactorPct)} {copy.utilizationApplied}
                 </span>
               </article>
               <article className="summary-card">
-                <span className="summary-card__label">Recommended capacity</span>
+                <span className="summary-card__label">{copy.recommendedCapacity}</span>
                 <strong>{result.recommendedCapacityMw.toFixed(1)} MW</strong>
                 <span className="summary-card__sub">
-                  {result.isStandardProposal
-                    ? "Standard proposal cap at 9.9MW"
-                    : "Area-based recommendation"}
+                  {result.isStandardProposal ? copy.standardCap : copy.areaBased}
                 </span>
               </article>
               <article className="summary-card">
-                <span className="summary-card__label">Preliminary EPC quote</span>
+                <span className="summary-card__label">{copy.preliminaryQuote}</span>
                 <strong>{formatEok(result.estimate.grandTotal)}</strong>
                 <span className="summary-card__sub">{copy.quickSales}</span>
               </article>
@@ -335,26 +347,29 @@ export function B2BLeadPage() {
             <div className="comparison-grid">
               <article className="panel-surface">
                 <div className="panel-surface__header">
-                  <span className="control-label">Proposal Basis</span>
+                  <span className="control-label">{copy.proposalBasis}</span>
                   <h3>{copy.areaSizing}</h3>
                 </div>
                 <div className="detail-list">
                   {result.notes.map((note, index) => (
                     <div className="detail-list__row" key={`note-${index}`}>
-                      <strong>Note {index + 1}</strong>
+                      <strong>{copy.noteLabel} {index + 1}</strong>
                       <span>{note}</span>
                     </div>
                   ))}
                   <div className="detail-list__row">
-                    <strong>Boundary points</strong>
-                    <span>{result.boundaryPoints.length} point(s) detected from polygon input</span>
+                    <strong>{copy.boundaryPoints}</strong>
+                    <span>
+                      {result.boundaryPoints.length}
+                      {copy.boundaryDetected}
+                    </span>
                   </div>
                 </div>
               </article>
 
               <article className="panel-surface">
                 <div className="panel-surface__header">
-                  <span className="control-label">Request Summary</span>
+                  <span className="control-label">{copy.requestSummary}</span>
                   <h3>{copy.salesMemo}</h3>
                 </div>
                 <textarea className="summary-textarea" readOnly value={leadSummary} />

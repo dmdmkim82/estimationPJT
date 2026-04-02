@@ -143,9 +143,11 @@ export type EstimateResult = {
   categoryTotals: Record<CostCategory, number>;
   siteItems: CostItem[];
   drawingItems: CostItem[];
+  projectAddonSubtotal: number;
   costSubtotal: number;
   siteSubtotal: number;
   drawingSubtotal: number;
+  marginEffect: number;
   constructionQuote: number;
   warranty: number;
   grandTotal: number;
@@ -159,6 +161,51 @@ export type EstimateResult = {
   lcoe: LcoeResult;
   layout: LayoutPreview;
   mapQuery: string;
+};
+
+export type EscalationBreakdownRow = {
+  category: CostCategory;
+  label: string;
+  annualRatePct: number;
+  years: number;
+  multiplier: number;
+  compoundedPct: number;
+};
+
+export type MonteCarloBucket = {
+  min: number;
+  max: number;
+  count: number;
+};
+
+export type MonteCarloSummary = {
+  sampleCount: number;
+  seed: number;
+  p10: number;
+  p50: number;
+  p90: number;
+  mean: number;
+  min: number;
+  max: number;
+  buckets: MonteCarloBucket[];
+};
+
+export type EstimateBenchmark = {
+  currentManwonPerKw: number;
+  rangeMinManwonPerKw: number;
+  rangeAvgManwonPerKw: number;
+  rangeMaxManwonPerKw: number;
+  positionPct: number;
+  status: "LOW" | "NORMAL" | "HIGH";
+  verdict: string;
+};
+
+export type EstimateUncertaintyProfile = {
+  S: number;
+  P: number;
+  C: number;
+  site: number;
+  drawing: number;
 };
 
 type ProjectOption = {
@@ -177,69 +224,83 @@ type SiteSurveyOption = {
 
 const round = (value: number, digits = 4) => Number(value.toFixed(digits));
 
+const KW_BENCHMARK_RANGE = {
+  min: 80,
+  avg: 120,
+  max: 160,
+} as const;
+
+export const DEFAULT_UNCERTAINTY_PROFILE: EstimateUncertaintyProfile = {
+  S: 20,
+  P: 20,
+  C: 20,
+  site: 20,
+  drawing: 20,
+};
+
 const DEFAULT_REFERENCE_ITEMS: ReferenceProjectItem[] = [
   {
     code: "S-101",
-    name: "Engineering / permitting",
+    name: "엔지니어링 / 인허가",
     category: "S",
     amountEok: 12.44,
-    note: "Reference PJT design, permit, licensing package",
+    note: "기준 프로젝트 설계, 인허가, 라이선스 패키지",
   },
   {
     code: "S-102",
-    name: "Project management / commissioning",
+    name: "프로젝트 관리 / 시운전",
     category: "S",
     amountEok: 10.9,
-    note: "Reference PJT PMO and startup support",
+    note: "기준 프로젝트 PMO 및 시운전 지원",
   },
   {
     code: "P-201",
-    name: "Fuel-cell module package",
+    name: "연료전지 모듈 패키지",
     category: "P",
     amountEok: 22.1,
-    note: "Main SOFC / BOP procurement package",
+    note: "주기기 SOFC / BOP 조달 패키지",
   },
   {
     code: "P-202",
-    name: "Balance-of-plant equipment",
+    name: "보조기기 패키지",
     category: "P",
     amountEok: 8.4,
-    note: "Skids, water treatment, auxiliaries",
+    note: "스키드, 수처리, 보조설비",
   },
   {
     code: "P-203",
-    name: "Electrical package",
+    name: "전기 패키지",
     category: "P",
     amountEok: 6.04,
-    note: "Transformers, switchgear, controls interface",
+    note: "변압기, 스위치기어, 제어 인터페이스",
   },
   {
     code: "C-301",
-    name: "Civil and foundation works",
+    name: "토목 및 기초 공사",
     category: "C",
     amountEok: 18.5,
-    note: "Ground improvement and equipment foundation",
+    note: "지반개량 및 설비 기초",
   },
   {
     code: "C-302",
-    name: "Mechanical erection / piping",
+    name: "기계 설치 / 배관 공사",
     category: "C",
     amountEok: 15.8,
-    note: "Mechanical installation and utility routing",
+    note: "기계 설치 및 유틸리티 배관",
   },
   {
     code: "C-303",
-    name: "Electrical installation",
+    name: "전기 설치 공사",
     category: "C",
     amountEok: 10.2,
-    note: "Cable, terminations, panel hookup",
+    note: "케이블, 단말 처리, 패널 접속",
   },
   {
     code: "C-304",
-    name: "Auxiliary building / enclosure",
+    name: "부대 건축물 / 외함",
     category: "C",
     amountEok: 11.28,
-    note: "Ancillary structures and utility rooms",
+    note: "부대 구조물 및 유틸리티실",
   },
 ];
 
@@ -257,8 +318,8 @@ export const DEFAULT_REFERENCE_PROJECT: ReferenceProject = {
   totalEok: DEFAULT_REFERENCE_TOTAL,
   items: DEFAULT_REFERENCE_ITEMS,
   notes: [
-    "Built-in fallback reference matching the reviewed 9.9MW workbook.",
-    "Use uploaded Excel references to improve fidelity for actual bids.",
+    "검토한 9.9MW 워크북을 기준으로 만든 기본 참조값입니다.",
+    "실제 입찰 검토 시에는 업로드한 Excel 기준서를 우선 사용하세요.",
   ],
 };
 
@@ -271,45 +332,45 @@ const PROJECT_ADDONS_PER_MW: Record<ProjectType, CostItem[]> = {
   singleOffice: [
     {
       code: "ADD-C-305",
-      name: "Office building and steel frame",
+      name: "사무동 및 철골 프레임",
       category: "C",
       kind: "project-addon",
       amountEok: 1.2,
       adjustedAmountEok: 0,
-      note: "Base-year unit allowance per MW",
-      basis: "Office / admin enclosure",
+      note: "기준연도 MW당 단가 가정",
+      basis: "사무동 / 지원동 범위",
     },
     {
       code: "ADD-C-306",
-      name: "HVAC and ancillary systems",
+      name: "HVAC 및 부대설비",
       category: "C",
       kind: "project-addon",
       amountEok: 0.48,
       adjustedAmountEok: 0,
-      note: "Base-year unit allowance per MW",
-      basis: "Building HVAC and support systems",
+      note: "기준연도 MW당 단가 가정",
+      basis: "건물 HVAC 및 지원설비",
     },
   ],
   multiLevel: [
     {
       code: "ADD-C-307",
-      name: "Multi-level structural frame",
+      name: "복층 구조 프레임",
       category: "C",
       kind: "project-addon",
       amountEok: 1.8,
       adjustedAmountEok: 0,
-      note: "Base-year unit allowance per MW",
-      basis: "Stacked plant arrangement",
+      note: "기준연도 MW당 단가 가정",
+      basis: "복층 플랜트 배치",
     },
     {
       code: "ADD-C-308",
-      name: "Vertical transfer equipment",
+      name: "수직 이송 설비",
       category: "C",
       kind: "project-addon",
       amountEok: 0.32,
       adjustedAmountEok: 0,
-      note: "Base-year unit allowance per MW",
-      basis: "Vertical logistics / lifting allowance",
+      note: "기준연도 MW당 단가 가정",
+      basis: "수직 물류 / 양중 가산",
     },
   ],
 };
@@ -317,84 +378,84 @@ const PROJECT_ADDONS_PER_MW: Record<ProjectType, CostItem[]> = {
 export const PROJECT_OPTIONS: ProjectOption[] = [
   {
     id: "singleOutdoor",
-    label: "Single Outdoor",
-    description: "Closest to the 9.9MW outdoor reference PJT.",
+    label: "단층 옥외형",
+    description: "9.9MW 옥외형 기준 프로젝트와 가장 유사합니다.",
   },
   {
     id: "singleOffice",
-    label: "Single + Office",
-    description: "Adds office / support building scope to the outdoor baseline.",
+    label: "단층 + 사무동",
+    description: "옥외형 기준에 사무동 / 지원동 범위를 더합니다.",
   },
   {
     id: "multiLevel",
-    label: "Multi Level",
-    description: "Assumes stacked arrangement with additional structure and handling.",
+    label: "복층형",
+    description: "복층 배치에 따른 추가 구조물과 양중 범위를 반영합니다.",
   },
 ];
 
 export const SITE_SURVEY_OPTIONS: SiteSurveyOption[] = [
   {
     id: "grading",
-    label: "Site grading",
+    label: "부지 정지",
     unit: "lot",
     unitPriceEokPerUnit: 1.5,
-    note: "Bulk earthwork and leveling",
+    note: "대량 토공 및 레벨링",
   },
   {
     id: "retainingWall",
-    label: "Retaining wall",
+    label: "옹벽",
     unit: "m",
     unitPriceEokPerUnit: 0.025,
-    note: "Slope stabilization or site retaining wall",
+    note: "사면 안정화 또는 부지 옹벽",
   },
   {
     id: "hru",
     label: "HRU",
     unit: "MW",
     unitPriceEokPerUnit: 0.12,
-    note: "Heat recovery package tied to output scale",
+    note: "출력 규모 연동 열회수 패키지",
   },
   {
     id: "hws",
-    label: "Hot-water system",
+    label: "온수 시스템",
     unit: "MW",
     unitPriceEokPerUnit: 0.08,
-    note: "District heat or utility hot-water distribution",
+    note: "지역난방 또는 유틸리티 온수 배관",
   },
   {
     id: "mws",
-    label: "Medium-water system",
+    label: "중온수 시스템",
     unit: "MW",
     unitPriceEokPerUnit: 0.06,
-    note: "Process / utility water balance package",
+    note: "공정 / 유틸리티 수계 패키지",
   },
   {
     id: "heatPipe",
-    label: "Heat pipe 200A",
+    label: "열배관 200A",
     unit: "km",
     unitPriceEokPerUnit: 0.35,
-    note: "District utility routing",
+    note: "지역 유틸리티 배관",
   },
   {
     id: "lineOverhead",
-    label: "22.9kV overhead line",
+    label: "22.9kV 가공선로",
     unit: "km",
     unitPriceEokPerUnit: 0.45,
-    note: "Overhead grid tie",
+    note: "가공 송전 연계",
   },
   {
     id: "lineUnderground",
-    label: "22.9kV underground line",
+    label: "22.9kV 지중선로",
     unit: "km",
     unitPriceEokPerUnit: 0.8,
-    note: "Underground grid tie",
+    note: "지중 송전 연계",
   },
 ];
 
 export const DEFAULT_INPUT: EstimateInput = {
-  projectName: "Incheon Fuel Cell EPC",
-  siteName: "Songdo District Energy Site",
-  siteAddress: "Songdo, Incheon, South Korea",
+  projectName: "인천 연료전지 EPC",
+  siteName: "송도 집단에너지 부지",
+  siteAddress: "인천 송도",
   latitude: 37.3886,
   longitude: 126.6432,
   projectType: "singleOutdoor",
@@ -413,7 +474,7 @@ export const DEFAULT_INPUT: EstimateInput = {
     controlPct: 0,
   },
   inflation: {
-    sourceLabel: "2025 Korea EPC composite price-index assumption",
+    sourceLabel: "2025년 EPC 복합 물가지수 가정",
     serviceRate: 2.8,
     procurementRate: 5.4,
     constructionRate: 6.8,
@@ -432,7 +493,7 @@ export const REFERENCE_TEMPLATE = {
   name: DEFAULT_REFERENCE_PROJECT.name,
   referenceYear: DEFAULT_REFERENCE_PROJECT.referenceYear,
   referenceCapacityMw: DEFAULT_REFERENCE_PROJECT.referenceCapacityMw,
-  referenceType: "Single Outdoor",
+  referenceType: "단층 옥외형",
   referenceTotalEok: DEFAULT_REFERENCE_PROJECT.totalEok,
 };
 
@@ -443,6 +504,48 @@ function getAnnualRateForCategory(
   if (category === "S") return inflation.serviceRate / 100;
   if (category === "P") return inflation.procurementRate / 100;
   return inflation.constructionRate / 100;
+}
+
+export function getEscalationBreakdown(
+  baseYear: number,
+  startYear: number,
+  inflation: InflationProfileInput,
+): EscalationBreakdownRow[] {
+  const years = Math.max(0, startYear - baseYear);
+
+  return [
+    {
+      category: "S",
+      label: "서비스",
+      annualRatePct: inflation.serviceRate,
+      years,
+      multiplier: round(Math.pow(1 + inflation.serviceRate / 100, years), 4),
+      compoundedPct:
+        years === 0 ? 0 : round((Math.pow(1 + inflation.serviceRate / 100, years) - 1) * 100, 2),
+    },
+    {
+      category: "P",
+      label: "조달",
+      annualRatePct: inflation.procurementRate,
+      years,
+      multiplier: round(Math.pow(1 + inflation.procurementRate / 100, years), 4),
+      compoundedPct:
+        years === 0
+          ? 0
+          : round((Math.pow(1 + inflation.procurementRate / 100, years) - 1) * 100, 2),
+    },
+    {
+      category: "C",
+      label: "시공",
+      annualRatePct: inflation.constructionRate,
+      years,
+      multiplier: round(Math.pow(1 + inflation.constructionRate / 100, years), 4),
+      compoundedPct:
+        years === 0
+          ? 0
+          : round((Math.pow(1 + inflation.constructionRate / 100, years) - 1) * 100, 2),
+    },
+  ];
 }
 
 function inflateAmount(
@@ -502,11 +605,11 @@ function buildDrawingItems(
   if (drawing.civilPct > 0) {
     items.push({
       code: "DRW-C-401",
-      name: "Civil drawing variation",
+      name: "토목 도면 차이",
       category: "C",
       pct: drawing.civilPct,
       amountEok: civilBase * (drawing.civilPct / 100),
-      note: "Applied to civil / foundation-heavy construction slice",
+      note: "토목 / 기초 비중이 큰 시공 범위에 적용",
     });
   }
 
@@ -514,11 +617,11 @@ function buildDrawingItems(
   if (drawing.electricalPct > 0) {
     items.push({
       code: "DRW-P-402",
-      name: "Electrical drawing variation",
+      name: "전기 도면 차이",
       category: "P",
       pct: drawing.electricalPct,
       amountEok: electricalBase * (drawing.electricalPct / 100),
-      note: "Applied to switchgear, cable, and connection package",
+      note: "스위치기어, 케이블, 접속 범위에 적용",
     });
   }
 
@@ -526,11 +629,11 @@ function buildDrawingItems(
   if (drawing.mechanicalPct > 0) {
     items.push({
       code: "DRW-C-403",
-      name: "Mechanical / piping variation",
+      name: "기계 / 배관 도면 차이",
       category: "C",
       pct: drawing.mechanicalPct,
       amountEok: mechanicalBase * (drawing.mechanicalPct / 100),
-      note: "Applied to piping, skids, and mechanical tie-ins",
+      note: "배관, 스키드, 기계 접속 범위에 적용",
     });
   }
 
@@ -538,11 +641,11 @@ function buildDrawingItems(
   if (drawing.controlPct > 0) {
     items.push({
       code: "DRW-S-404",
-      name: "Control / I&C variation",
+      name: "제어 / 계장 도면 차이",
       category: "S",
       pct: drawing.controlPct,
       amountEok: controlBase * (drawing.controlPct / 100),
-      note: "Applied to logic, controls, and interface engineering",
+      note: "로직, 제어, 인터페이스 엔지니어링에 적용",
     });
   }
 
@@ -558,7 +661,7 @@ function buildDrawingItems(
     basis:
       input.drawingChange.referenceDrawingName && input.drawingChange.targetDrawingName
         ? `${input.drawingChange.referenceDrawingName} -> ${input.drawingChange.targetDrawingName}`
-        : "Manual discipline delta",
+        : "수동 공종 차이 입력",
   }));
 }
 
@@ -587,24 +690,24 @@ function calculateLcoe(grandTotal: number, input: EstimateInput): LcoeResult {
 
   const benchmarks = [
     {
-      label: "Utility solar PV",
+      label: "유틸리티 태양광",
       lcoeKrwPerKwh: 118,
-      note: "Internal planning benchmark",
+      note: "내부 계획 기준값",
     },
     {
-      label: "Onshore wind",
+      label: "육상풍력",
       lcoeKrwPerKwh: 136,
-      note: "Internal planning benchmark",
+      note: "내부 계획 기준값",
     },
     {
-      label: "LNG CHP",
+      label: "LNG 열병합",
       lcoeKrwPerKwh: 173,
-      note: "Internal planning benchmark",
+      note: "내부 계획 기준값",
     },
     {
-      label: "BESS + renewable hybrid",
+      label: "BESS + 재생에너지 하이브리드",
       lcoeKrwPerKwh: 194,
-      note: "Internal planning benchmark",
+      note: "내부 계획 기준값",
     },
   ].map((item) => ({
     ...item,
@@ -649,7 +752,7 @@ function buildLayoutPreview(input: EstimateInput): LayoutPreview {
 
   blocks.push({
     id: "aux-control",
-    label: "Control / office",
+    label: "제어 / 사무",
     kind: "aux",
     x: cols * 1.25 + 0.25,
     y: 0,
@@ -658,7 +761,7 @@ function buildLayoutPreview(input: EstimateInput): LayoutPreview {
   });
   blocks.push({
     id: "aux-water",
-    label: "Water / utility",
+    label: "용수 / 유틸리티",
     kind: "aux",
     x: cols * 1.25 + 0.25,
     y: 1.15,
@@ -667,7 +770,7 @@ function buildLayoutPreview(input: EstimateInput): LayoutPreview {
   });
   blocks.push({
     id: "grid-yard",
-    label: "Grid tie",
+    label: "계통 연계",
     kind: "grid",
     x: cols * 1.25 + 0.25,
     y: 2.3,
@@ -681,11 +784,11 @@ function buildLayoutPreview(input: EstimateInput): LayoutPreview {
     Math.round(moduleCount * 420 + 2400 + lineLength * 1100 + (input.siteSurvey.grading || 0) * 1200);
 
   const notes = [
-    `${moduleCount} fuel-cell blocks arranged in ${rows} rows x ${cols} cols.`,
-    "Auxiliary zone reserves control building, utility systems, and grid tie yard.",
+    `${moduleCount}개 연료전지 블록을 ${rows}행 x ${cols}열로 배치했습니다.`,
+    "부대 영역에는 제어동, 유틸리티 설비, 계통 연계 야드를 포함합니다.",
     lineLength > 0
-      ? `Grid interconnection corridor reflects ${lineLength.toFixed(1)}km of line scope.`
-      : "No transmission corridor quantity entered yet.",
+      ? `계통 연계 구간에 선로 ${lineLength.toFixed(1)}km를 반영했습니다.`
+      : "입력된 송전 연계 거리 값이 없습니다.",
   ];
 
   return {
@@ -710,10 +813,10 @@ function buildRiskFindings(
 
   if (years >= 2) {
     findings.push({
-      title: "Price escalation exposure",
+      title: "물가상승 노출",
       severity: years >= 3 ? "HIGH" : "MEDIUM",
-      reason: `${years} years of escalation are being applied from ${input.baseYear} to ${input.startYear}.`,
-      mitigation: "Lock long-lead procurement packages early and separate escalation clauses by category.",
+      reason: `${input.baseYear}년에서 ${input.startYear}년까지 ${years}년의 물가상승이 적용됩니다.`,
+      mitigation: "장기 조달 품목을 조기 확정하고 공종별 물가상승 조항을 분리하세요.",
       impactEok: round(
         categoryTotals.P * (Math.pow(1 + input.inflation.procurementRate / 100, 0.5) - 1),
         2,
@@ -723,20 +826,20 @@ function buildRiskFindings(
 
   if (siteSubtotal >= 5) {
     findings.push({
-      title: "Site preparation / utility scope risk",
+      title: "부지 정지 / 유틸리티 범위 리스크",
       severity: siteSubtotal >= 10 ? "HIGH" : "MEDIUM",
-      reason: "Civil and grid interconnection adders are materially affecting the estimate.",
-      mitigation: "Validate geotechnical, utility corridor, and grid-tie assumptions during early site review.",
+      reason: "토목과 계통 연계 가산이 견적에 유의미한 영향을 주고 있습니다.",
+      mitigation: "초기 현장 검토 단계에서 지반, 유틸리티 구간, 계통 연계 가정을 재확인하세요.",
       impactEok: round(siteSubtotal * 0.15, 2),
     });
   }
 
   if (drawingSubtotal >= 2) {
     findings.push({
-      title: "Drawing variation risk",
+      title: "도면 차이 리스크",
       severity: drawingSubtotal >= 5 ? "HIGH" : "MEDIUM",
-      reason: "Reference and target drawings differ enough to require explicit discipline-level allowances.",
-      mitigation: "Run a formal model / drawing delta review before final bid freeze.",
+      reason: "기준 도면과 목표 도면 차이가 있어 공종별 가산 반영이 필요합니다.",
+      mitigation: "최종 입찰 확정 전에 정식 모델 / 도면 차이 검토를 수행하세요.",
       impactEok: round(drawingSubtotal * 0.3, 2),
     });
   }
@@ -744,20 +847,20 @@ function buildRiskFindings(
   const scaleDelta = input.capacityMw / referenceProject.referenceCapacityMw - 1;
   if (Math.abs(scaleDelta) >= 0.35) {
     findings.push({
-      title: "Reference scaling uncertainty",
+      title: "기준 프로젝트 스케일링 불확실성",
       severity: Math.abs(scaleDelta) >= 0.6 ? "HIGH" : "MEDIUM",
-      reason: `Target capacity is ${(scaleDelta * 100).toFixed(1)}% away from the selected reference project.`,
-      mitigation: "Use at least one closer-capacity reference project or normalize by equipment block count.",
+      reason: `목표 용량이 선택한 기준 프로젝트와 ${(scaleDelta * 100).toFixed(1)}% 차이납니다.`,
+      mitigation: "용량이 더 유사한 기준 프로젝트를 추가하거나 설비 블록 수 기준으로 보정하세요.",
       impactEok: round(categoryTotals.P * Math.abs(scaleDelta) * 0.08, 2),
     });
   }
 
   if (referenceProject.source === "built-in") {
     findings.push({
-      title: "Reference fidelity gap",
+      title: "기준 프로젝트 정합성 부족",
       severity: "LOW",
-      reason: "The estimate is still anchored to the built-in sample workbook, not an uploaded project-specific reference.",
-      mitigation: "Upload a detailed reference workbook to replace the generic baseline.",
+      reason: "현재 견적은 업로드한 프로젝트별 기준서가 아니라 기본 샘플 기준값에 의존하고 있습니다.",
+      mitigation: "보다 상세한 기준 워크북을 업로드해 일반 기준값을 대체하세요.",
       impactEok: round(categoryTotals.S * 0.03, 2),
     });
   }
@@ -789,6 +892,61 @@ export function formatPercent(value: number, digits = 1) {
   })}%`;
 }
 
+function hashSeed(source: string) {
+  let hash = 2166136261;
+
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
+function createSeededRandom(seed: number) {
+  let state = seed >>> 0;
+
+  return () => {
+    state += 0x6d2b79f5;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function sampleTriangular(
+  random: () => number,
+  minimum: number,
+  mode: number,
+  maximum: number,
+) {
+  const ratio = (mode - minimum) / (maximum - minimum);
+  const value = random();
+
+  if (value <= ratio) {
+    return minimum + Math.sqrt(value * (maximum - minimum) * (mode - minimum));
+  }
+
+  return maximum - Math.sqrt((1 - value) * (maximum - minimum) * (maximum - mode));
+}
+
+function quantile(sortedValues: number[], percentile: number) {
+  if (sortedValues.length === 0) return 0;
+  if (sortedValues.length === 1) return sortedValues[0];
+
+  const index = (sortedValues.length - 1) * percentile;
+  const lowerIndex = Math.floor(index);
+  const upperIndex = Math.ceil(index);
+  const weight = index - lowerIndex;
+
+  if (lowerIndex === upperIndex) return sortedValues[lowerIndex];
+
+  return (
+    sortedValues[lowerIndex] * (1 - weight) + sortedValues[upperIndex] * weight
+  );
+}
+
 export function inferCostCategoryFromText(text: string): CostCategory {
   const normalized = text.toLowerCase();
   if (
@@ -808,6 +966,153 @@ export function inferCostCategoryFromText(text: string): CostCategory {
   }
 
   return "C";
+}
+
+export function buildEstimateFingerprint(
+  input: EstimateInput,
+  referenceProject: ReferenceProject,
+) {
+  return JSON.stringify({
+    projectName: input.projectName,
+    siteName: input.siteName,
+    siteAddress: input.siteAddress,
+    latitude: round(input.latitude, 6),
+    longitude: round(input.longitude, 6),
+    projectType: input.projectType,
+    capacityMw: round(input.capacityMw, 3),
+    baseYear: input.baseYear,
+    startYear: input.startYear,
+    marginRate: round(input.marginRate, 3),
+    warrantyRate: round(input.warrantyRate, 3),
+    siteSurvey: input.siteSurvey,
+    drawingChange: input.drawingChange,
+    inflation: input.inflation,
+    referenceId: referenceProject.id,
+    referenceTotalEok: round(referenceProject.totalEok, 4),
+    referenceItems: referenceProject.items.map((item) => ({
+      code: item.code,
+      category: item.category,
+      amountEok: round(item.amountEok, 4),
+    })),
+  });
+}
+
+export function runMonteCarloEstimate(
+  result: EstimateResult,
+  input: EstimateInput,
+  referenceProject: ReferenceProject,
+  sampleCount = 10_000,
+  uncertaintyProfile: EstimateUncertaintyProfile = DEFAULT_UNCERTAINTY_PROFILE,
+): MonteCarloSummary {
+  const deterministicItems = [...result.costItems, ...result.siteItems];
+  const seed = hashSeed(buildEstimateFingerprint(input, referenceProject));
+  const random = createSeededRandom(seed);
+
+  if (deterministicItems.length === 0) {
+    return {
+      sampleCount,
+      seed,
+      p10: result.grandTotal,
+      p50: result.grandTotal,
+      p90: result.grandTotal,
+      mean: result.grandTotal,
+      min: result.grandTotal,
+      max: result.grandTotal,
+      buckets: [{ min: result.grandTotal, max: result.grandTotal, count: sampleCount }],
+    };
+  }
+
+  const samples = Array.from({ length: sampleCount }, () => {
+    const sampledAdjustedCost = deterministicItems.reduce((sum, item) => {
+      const uncertaintyPct =
+        item.kind === "site-survey"
+          ? uncertaintyProfile.site
+          : item.kind === "drawing-change"
+            ? uncertaintyProfile.drawing
+            : uncertaintyProfile[item.category];
+      const minimumFactor = 1 - uncertaintyPct / 100;
+      const maximumFactor = 1 + uncertaintyPct / 100;
+      const factor = sampleTriangular(random, minimumFactor, 1, maximumFactor);
+      return sum + item.adjustedAmountEok * factor;
+    }, 0);
+    const constructionQuote = sampledAdjustedCost / (1 - input.marginRate / 100);
+    const warranty = constructionQuote * (input.warrantyRate / 100);
+    return constructionQuote + warranty;
+  }).sort((left, right) => left - right);
+
+  const p10 = quantile(samples, 0.1);
+  const p50 = quantile(samples, 0.5);
+  const p90 = quantile(samples, 0.9);
+  const min = samples[0];
+  const max = samples[samples.length - 1];
+  const mean = samples.reduce((sum, value) => sum + value, 0) / samples.length;
+  const bucketCount = 24;
+  const span = Math.max(max - min, 0.0001);
+  const step = span / bucketCount;
+  const buckets = Array.from({ length: bucketCount }, (_, index) => ({
+    min: min + step * index,
+    max: index === bucketCount - 1 ? max : min + step * (index + 1),
+    count: 0,
+  }));
+
+  for (const value of samples) {
+    const bucketIndex = Math.min(
+      bucketCount - 1,
+      Math.max(0, Math.floor((value - min) / step)),
+    );
+    buckets[bucketIndex].count += 1;
+  }
+
+  return {
+    sampleCount,
+    seed,
+    p10: round(p10, 2),
+    p50: round(p50, 2),
+    p90: round(p90, 2),
+    mean: round(mean, 2),
+    min: round(min, 2),
+    max: round(max, 2),
+    buckets: buckets.map((bucket) => ({
+      min: round(bucket.min, 2),
+      max: round(bucket.max, 2),
+      count: bucket.count,
+    })),
+  };
+}
+
+export function buildKwBenchmark(result: EstimateResult, input: EstimateInput): EstimateBenchmark {
+  const currentManwonPerKw = (result.grandTotal * 10) / Math.max(0.1, input.capacityMw);
+  let status: EstimateBenchmark["status"] = "NORMAL";
+  let verdict = "평균 수준 - 정상 범위";
+
+  if (currentManwonPerKw < KW_BENCHMARK_RANGE.min) {
+    status = "LOW";
+    verdict = "기준 범위 이하 - 누락 여부 점검 필요";
+  } else if (currentManwonPerKw < 100) {
+    verdict = "하단 범위 - 절감형 수준";
+  } else if (currentManwonPerKw <= 140) {
+    verdict = "평균 수준 - 정상 범위";
+  } else if (currentManwonPerKw <= KW_BENCHMARK_RANGE.max) {
+    verdict = "상단 범위 - 범위 내 보수적 수준";
+  } else {
+    status = "HIGH";
+    verdict = "기준 범위 상회 - 범위 확대 사유 확인 필요";
+  }
+
+  const positionPct =
+    ((currentManwonPerKw - KW_BENCHMARK_RANGE.min) /
+      (KW_BENCHMARK_RANGE.max - KW_BENCHMARK_RANGE.min)) *
+    100;
+
+  return {
+    currentManwonPerKw: round(currentManwonPerKw, 1),
+    rangeMinManwonPerKw: KW_BENCHMARK_RANGE.min,
+    rangeAvgManwonPerKw: KW_BENCHMARK_RANGE.avg,
+    rangeMaxManwonPerKw: KW_BENCHMARK_RANGE.max,
+    positionPct: round(Math.min(130, Math.max(-10, positionPct)), 1),
+    status,
+    verdict,
+  };
 }
 
 export function calculateEstimate(
@@ -877,6 +1182,10 @@ export function calculateEstimate(
 
   const costItems = [...preDrawingItems, ...drawingItems];
   const categoryTotals = reduceCategoryTotals(costItems);
+  const projectAddonSubtotal = projectAddonItems.reduce(
+    (sum, item) => sum + item.adjustedAmountEok,
+    0,
+  );
   const costSubtotal = costItems.reduce((sum, item) => sum + item.adjustedAmountEok, 0);
   const siteSubtotal = siteItems.reduce((sum, item) => sum + item.adjustedAmountEok, 0);
   const drawingSubtotal = drawingItems.reduce((sum, item) => sum + item.adjustedAmountEok, 0);
@@ -949,20 +1258,20 @@ export function calculateEstimate(
   );
 
   const scenarios: RiskRow[] = [
-    { label: "Composite inflation +2.5%", total: inflationScenario.grandTotal },
-    { label: "Delay +6 months", total: oneHalfYearDelayScenario.grandTotal },
-    { label: "Grid / civil surprise", total: gridShock.grandTotal },
-    { label: "Procurement commodity +6%", total: commodityShock.grandTotal },
+    { label: "복합 물가상승 +2.5%", total: inflationScenario.grandTotal },
+    { label: "공기 지연 +6개월", total: oneHalfYearDelayScenario.grandTotal },
+    { label: "계통 / 토목 추가 리스크", total: gridShock.grandTotal },
+    { label: "조달 원자재 +6%", total: commodityShock.grandTotal },
   ];
 
   const strategies: RiskRow[] = [
     {
-      label: `Conservative (${conservativeMargin.toFixed(1)}%)`,
+      label: `보수형 (${conservativeMargin.toFixed(1)}%)`,
       total: conservative.grandTotal,
     },
-    { label: `Neutral (${input.marginRate.toFixed(1)}%)`, total: neutral.grandTotal },
+    { label: `기준형 (${input.marginRate.toFixed(1)}%)`, total: neutral.grandTotal },
     {
-      label: `Aggressive (${aggressiveMargin.toFixed(1)}%)`,
+      label: `공격형 (${aggressiveMargin.toFixed(1)}%)`,
       total: aggressive.grandTotal,
     },
   ];
@@ -988,38 +1297,34 @@ export function calculateEstimate(
 
   const basis: BasisPoint[] = [
     {
-      title: "Selected reference project",
-      detail: `${referenceProject.name} (${referenceProject.referenceCapacityMw}MW / ${referenceProject.referenceYear}) with ${referenceProject.items.length} cost items.`,
+      title: "선택한 기준 프로젝트",
+      detail: `${referenceProject.name} (${referenceProject.referenceCapacityMw}MW / ${referenceProject.referenceYear}) 기준서 ${referenceProject.items.length}개 항목을 사용했습니다.`,
     },
     {
-      title: "Capacity scaling",
-      detail: `${referenceProject.referenceCapacityMw}MW reference scaled to ${input.capacityMw.toFixed(1)}MW (${formatPercent(capacityFactor * 100, 1)} of reference).`,
+      title: "용량 보정",
+      detail: `${referenceProject.referenceCapacityMw}MW 기준 프로젝트를 ${input.capacityMw.toFixed(1)}MW로 환산했습니다. (${formatPercent(capacityFactor * 100, 1)} 수준)`,
     },
     {
-      title: "Escalation logic",
-      detail: `${input.baseYear} -> ${input.startYear}, using ${input.inflation.sourceLabel} with S/P/C rates ${formatPercent(input.inflation.serviceRate)}, ${formatPercent(input.inflation.procurementRate)}, ${formatPercent(input.inflation.constructionRate)}.`,
+      title: "물가상승 로직",
+      detail: `${input.baseYear} -> ${input.startYear}, ${input.inflation.sourceLabel} 기준으로 S/P/C 물가상승률 ${formatPercent(input.inflation.serviceRate)}, ${formatPercent(input.inflation.procurementRate)}, ${formatPercent(input.inflation.constructionRate)}를 적용했습니다.`,
     },
     {
-      title: "Site review adders",
+      title: "현장 가산",
       detail:
         siteItems.length > 0
-          ? `${siteItems.length} site-review items applied, totaling ${formatEok(siteSubtotal)} after escalation.`
-          : "No site-review quantity adders entered yet.",
+          ? `${siteItems.length}개 현장 검토 항목을 반영했고, 물가상승 후 합계는 ${formatEok(siteSubtotal)}입니다.`
+          : "입력된 현장 가산 항목이 없습니다.",
     },
     {
-      title: "Drawing variation",
+      title: "도면 차이",
       detail:
         drawingItems.length > 0
-          ? `${drawingItems.length} discipline allowances applied from drawing deltas, totaling ${formatEok(drawingSubtotal)}.`
-          : "No drawing-change allowance applied.",
+          ? `${drawingItems.length}개 공종 차이 가산을 적용했고, 합계는 ${formatEok(drawingSubtotal)}입니다.`
+          : "적용된 도면 차이 가산이 없습니다.",
     },
     {
-      title: "Commercial assumptions",
-      detail: `Target margin ${formatPercent(input.marginRate)} and warranty ${formatPercent(input.warrantyRate)} applied to EPC subtotal.`,
-    },
-    {
-      title: "LCOE assumption",
-      detail: `Capacity factor ${formatPercent(input.lcoe.capacityFactorPct)}, fuel ${input.lcoe.fuelCostKrwPerKwh.toFixed(0)} KRW/kWh, project life ${input.lcoe.projectLifeYears} years.`,
+      title: "상업 조건",
+      detail: `EPC 소계에 목표 마진 ${formatPercent(input.marginRate)}와 하자보수 ${formatPercent(input.warrantyRate)}를 반영했습니다.`,
     },
   ];
 
@@ -1045,9 +1350,11 @@ export function calculateEstimate(
     },
     siteItems,
     drawingItems,
+    projectAddonSubtotal: round(projectAddonSubtotal, 2),
     costSubtotal: round(costSubtotal, 2),
     siteSubtotal: round(siteSubtotal, 2),
     drawingSubtotal: round(drawingSubtotal, 2),
+    marginEffect: round(baseTotals.constructionQuote - (costSubtotal + siteSubtotal), 2),
     constructionQuote: round(baseTotals.constructionQuote, 2),
     warranty: round(baseTotals.warranty, 2),
     grandTotal: round(baseTotals.grandTotal, 2),

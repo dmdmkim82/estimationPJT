@@ -101,13 +101,13 @@ export function buildB2BLeadProposal(input: B2BLeadInput): B2BLeadResult {
   const usableAreaSqm = areaSqm * (input.landUseFactorPct / 100);
   const recommendedCapacityMw = recommendCapacityMw(usableAreaSqm);
   const isStandardProposal = recommendedCapacityMw === STANDARD_PROPOSAL_MW;
-  const leadName = input.companyName || "Prospect";
+  const leadName = input.companyName || "잠재고객";
   const anchorPoint = boundaryPoints[0];
 
   const estimate = calculateEstimate(
     {
       ...DEFAULT_INPUT,
-      projectName: `${leadName} Quick Proposal`,
+      projectName: `${leadName} 1차 제안`,
       siteName: leadName,
       siteAddress: input.siteAddress || DEFAULT_INPUT.siteAddress,
       latitude: anchorPoint?.lat ?? DEFAULT_INPUT.latitude,
@@ -120,13 +120,13 @@ export function buildB2BLeadProposal(input: B2BLeadInput): B2BLeadResult {
 
   const notes = [
     boundaryPoints.length >= 3
-      ? `${boundaryPoints.length} boundary points were converted into a polygon area.`
-      : "Boundary polygon was incomplete, so rectangular site dimensions were used.",
-    `Usable land factor ${input.landUseFactorPct.toFixed(0)}% applied to gross site area.`,
+      ? `경계 좌표 ${boundaryPoints.length}개를 읽어 다각형 면적으로 환산했습니다.`
+      : "경계 다각형 정보가 부족하여 가로 x 세로 입력값을 사용했습니다.",
+    `총 부지 면적에 유효 부지 비율 ${input.landUseFactorPct.toFixed(0)}%를 적용했습니다.`,
     isStandardProposal
-      ? `Site can support the standard ${STANDARD_PROPOSAL_MW}MW commercial proposal.`
-      : `Site appears better suited to ${recommendedCapacityMw.toFixed(1)}MW based on current usable area.`,
-    `Estimate is anchored to the built-in ${DEFAULT_REFERENCE_PROJECT.referenceYear} / ${DEFAULT_REFERENCE_PROJECT.referenceCapacityMw}MW reference project.`,
+      ? `현 부지는 표준 ${STANDARD_PROPOSAL_MW}MW 제안이 가능한 규모로 판단했습니다.`
+      : `현재 유효 면적 기준으로 ${recommendedCapacityMw.toFixed(1)}MW가 적정한 규모로 보입니다.`,
+    `견적은 기본 ${DEFAULT_REFERENCE_PROJECT.referenceYear}년 / ${DEFAULT_REFERENCE_PROJECT.referenceCapacityMw}MW 기준 프로젝트를 바탕으로 계산했습니다.`,
   ];
 
   return {
