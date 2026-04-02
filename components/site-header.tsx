@@ -16,8 +16,13 @@ export function SiteHeader() {
     <header className="site-header">
       <div className="site-header__inner">
         <Link className="site-header__brand" href="/estimate">
-          <span>{"\uC5F0\uB8CC\uC804\uC9C0 EPC"}</span>
-          <em>Studio</em>
+          <span className="site-header__brand-mark" aria-hidden="true">
+            SE
+          </span>
+          <span className="site-header__brand-copy">
+            <strong>{"\uC5F0\uB8CC\uC804\uC9C0 EPC"}</strong>
+            <em>Estimate Studio</em>
+          </span>
         </Link>
 
         <nav className="site-header__nav" aria-label="Primary">
@@ -39,9 +44,7 @@ export function SiteHeader() {
         </nav>
 
         <Link className="site-header__cta" href="/estimate">
-          <span className="button__stack">
-            <strong>{"\uACAC\uC801\uC0B0\uCD9C"}</strong>
-          </span>
+          <strong>{"\uACAC\uC801\uC0B0\uCD9C"}</strong>
         </Link>
       </div>
     </header>
